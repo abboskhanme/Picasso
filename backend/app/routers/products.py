@@ -1,0 +1,51 @@
+import uuid
+from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy.orm import Session
+from .. import models, schemas
+from ..database import get_db
+from ..deps import get_current_user
+
+router = APIRouter(prefix="/products", tags=["products"], dependencies=[Depends(get_current_user)])
+
+
+@router.get("", response_model=list[schemas.ProductOut])
+def list_products(db: Session = Depends(get_db)):
+    return db.query(models.Product).filter_by(is_active=True).order_by(models.Product.name).all()
+
+
+@router.post("", response_model=schemas.ProductOut)
+def create_product(data: schemas.ProductCreate, db: Session = Depends(get_db)):
+    p = models.Product(**data.model_dump())
+    db.add(p); db.commit(); db.refresh(p)
+    return p
+
+
+@router.patch("/{pid}", response_model=schemas.ProductOut)
+def update_product(pid: uuid.UUID, data: schemas.ProductUpdate, db: Session = Depends(get_db)):
+    p = db.get(models.Product, pid)
+    if not p:
+        raise HTTPException(404, "Mahsulot topilmadi")
+    for k, v in data.model_dump(exclude_unset=True).items():
+        setattr(p, k, v)
+    db.commit(); db.refresh(p)
+    return p
+
+
+@router.post("/{pid}/stock", response_model=schemas.ProductOut)
+def update_stock(pid: uuid.UUID, data: schemas.StockUpdate, db: Session = Depends(get_db)):
+    p = db.get(models.Product, pid)
+    if not p:
+        raise HTTPException(404, "Mahsulot topilmadi")
+    p.stock = (float(p.stock) + data.qty) if data.mode == "add" else data.qty
+    db.commit(); db.refresh(p)
+    return p
+
+
+@router.delete("/{pid}")
+def archive_product(pid: uuid.UUID, db: Session = Depends(get_db)):
+    p = db.get(models.Product, pid)
+    if not p:
+        raise HTTPException(404, "Mahsulot topilmadi")
+    p.is_active = False
+    db.commit()
+    return {"ok": True}

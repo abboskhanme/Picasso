@@ -1,0 +1,14 @@
+# Caddy domen uchun HTTPS sertifikatni Let's Encrypt'dan avtomatik oladi.
+{$DOMAIN} {
+	encode gzip
+
+	# /api/* → backend (prefiks olib tashlanadi: /api/auth/login -> /auth/login)
+	handle_path /api/* {
+		reverse_proxy backend:8000
+	}
+
+	# Qolgan barcha so'rovlar → frontend (SPA)
+	handle {
+		reverse_proxy frontend:80
+	}
+}
