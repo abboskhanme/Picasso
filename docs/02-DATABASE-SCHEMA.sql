@@ -336,8 +336,96 @@ insert into cash_flows (direction, amount, category, note)
 values ('in', 2000000, 'Investitsiya', 'Boshlang''ich kapital');
 
 -- ============================================================
+--  KENGAYTMA (2026): Ombor moduli — ishlab chiqarish, retsept,
+--  universal harakatlar jurnali, partiyalar.
+--  Eslatma: backend ishga tushganda bu jadvallarni SQLAlchemy avtomatik
+--  yaratadi (create_all). Bu blok hujjat va Supabase'da qo'lda yaratish uchun.
+-- ============================================================
+
+-- 9. INVENTORY_MOVEMENTS — universal harakatlar jurnali (audit log)
+--     Har qanday stok o'zgarishi (kirim/chiqim/ishlab chiqarish/sotuv/tuzatish/brak)
+--     shu yerga balance_after bilan yoziladi. Istalgan davr tarixini tiklash uchun.
+create table if not exists inventory_movements (
+  id            uuid primary key default gen_random_uuid(),
+  item_type     text not null,                 -- product | raw
+  item_id       uuid not null,
+  item_name     text not null,                 -- nom snapshot (tarix uchun)
+  item_category text,
+  unit          text,
+  move_type     text not null,                 -- buy|produce|use|sale|adjust|writeoff|return|manual
+  delta         numeric(12,3) not null,        -- ishorali (+ kirim, - chiqim)
+  balance_after numeric(12,3) not null,        -- harakatdan keyingi qoldiq
+  unit_cost     bigint not null default 0,
+  cost          bigint not null default 0,
+  ref_type      text,                          -- sale|production|purchase|count
+  ref_id        uuid,
+  note          text,
+  occurred_at   timestamptz not null default now(),
+  created_by    uuid references profiles(id)
+);
+create index if not exists idx_invmov_item on inventory_movements(item_type, item_id, occurred_at desc);
+create index if not exists idx_invmov_date on inventory_movements(occurred_at desc);
+create index if not exists idx_invmov_type on inventory_movements(move_type);
+
+-- 11. PRODUCT_RECIPES — retsept (BOM): 1 dona mahsulotga ketadigan xomashyo
+create table if not exists product_recipes (
+  id          uuid primary key default gen_random_uuid(),
+  product_id  uuid not null references products(id) on delete cascade,
+  material_id uuid not null references raw_materials(id) on delete cascade,
+  qty         numeric(12,3) not null check (qty > 0)
+);
+create index if not exists idx_recipe_product on product_recipes(product_id);
+
+-- 12. PRODUCTIONS — ishlab chiqarish partiyalari
+create table if not exists productions (
+  id           uuid primary key default gen_random_uuid(),
+  product_id   uuid not null references products(id),
+  product_name text not null,
+  qty          numeric(12,2) not null,
+  cost_total   bigint not null default 0,      -- sarflangan xomashyo tannarxi
+  unit_cost    bigint not null default 0,      -- 1 donaga tannarx
+  note         text,
+  occurred_at  timestamptz not null default now(),
+  created_by   uuid references profiles(id)
+);
+create index if not exists idx_productions_date on productions(occurred_at desc);
+
+-- 13. BATCHES — partiya / yaroqlilik muddati (FEFO)
+create table if not exists batches (
+  id              uuid primary key default gen_random_uuid(),
+  item_type       text not null,               -- product | raw
+  item_id         uuid not null,
+  item_name       text not null,
+  qty_initial     numeric(12,3) not null,
+  qty_remaining   numeric(12,3) not null,
+  unit            text,
+  production_date date,
+  expiry_date     date,
+  unit_cost       bigint not null default 0,
+  note            text,
+  is_active       boolean not null default true,
+  created_at      timestamptz not null default now()
+);
+create index if not exists idx_batches_item   on batches(item_type, item_id);
+create index if not exists idx_batches_expiry on batches(expiry_date);
+
+-- RLS (yangi jadvallar uchun) — backend to'g'ridan-to'g'ri ulanadi, lekin izchillik uchun
+do $$
+declare t text;
+begin
+  foreach t in array array['inventory_movements','product_recipes','productions','batches'] loop
+    execute format('alter table %I enable row level security;', t);
+    begin
+      execute format('create policy "authenticated_all" on %I for all to authenticated using (true) with check (true);', t);
+    exception when duplicate_object then null; end;
+  end loop;
+end $$;
+
+-- ============================================================
 --  TEKSHIRISH so'rovlari (ixtiyoriy)
 -- ============================================================
 -- select * from cash_balance;
 -- select * from low_stock_products;
 -- select * from customer_balances where debt > 0;
+-- select * from inventory_movements order by occurred_at desc limit 50;
+-- select * from batches where expiry_date <= current_date + 30 and is_active;

@@ -1,5 +1,5 @@
 import uuid
-from datetime import datetime
+from datetime import datetime, date
 from pydantic import BaseModel, EmailStr, Field, ConfigDict
 
 
@@ -134,12 +134,119 @@ class RawBuy(BaseModel):
     unit: str = "kg"
     qty: float = Field(gt=0)
     cost: int = Field(ge=0)
+    expiry_date: date | None = None
+    note: str | None = None
 
 
 class RawUse(BaseModel):
     material_id: uuid.UUID
     qty: float = Field(gt=0)
     note: str | None = None
+
+
+# ---------- Harakatlar jurnali ----------
+class MovementOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: uuid.UUID
+    item_type: str
+    item_id: uuid.UUID
+    item_name: str
+    item_category: str | None
+    unit: str | None
+    move_type: str
+    delta: float
+    balance_after: float
+    unit_cost: int
+    cost: int
+    ref_type: str | None
+    note: str | None
+    occurred_at: datetime
+
+
+# ---------- Inventarizatsiya / brak ----------
+class StockCount(BaseModel):
+    item_type: str                 # product | raw
+    item_id: uuid.UUID
+    actual_qty: float = Field(ge=0)
+    note: str | None = None
+
+
+class WriteOff(BaseModel):
+    item_type: str                 # product | raw
+    item_id: uuid.UUID
+    qty: float = Field(gt=0)
+    note: str | None = None
+
+
+# ---------- Retsept (BOM) ----------
+class RecipeLineIn(BaseModel):
+    material_id: uuid.UUID
+    qty: float = Field(gt=0)
+
+
+class RecipeSet(BaseModel):
+    items: list[RecipeLineIn] = []
+
+
+class RecipeLineOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    material_id: uuid.UUID
+    qty: float
+
+
+class RecipeOut(BaseModel):
+    product_id: uuid.UUID
+    items: list[RecipeLineOut]
+    cost_estimate: int             # joriy narxlarda 1 dona tannarxi
+
+
+# ---------- Ishlab chiqarish ----------
+class ProduceIn(BaseModel):
+    product_id: uuid.UUID
+    qty: float = Field(gt=0)
+    expiry_date: date | None = None
+    note: str | None = None
+
+
+class ProductionOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: uuid.UUID
+    product_id: uuid.UUID
+    product_name: str
+    qty: float
+    cost_total: int
+    unit_cost: int
+    note: str | None
+    occurred_at: datetime
+
+
+# ---------- Partiya / muddat ----------
+class BatchOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: uuid.UUID
+    item_type: str
+    item_id: uuid.UUID
+    item_name: str
+    qty_initial: float
+    qty_remaining: float
+    unit: str | None
+    production_date: date | None
+    expiry_date: date | None
+    unit_cost: int
+    is_active: bool
+
+
+# ---------- Reorder (buyurtma tavsiyasi) ----------
+class ReorderOut(BaseModel):
+    item_type: str
+    item_id: uuid.UUID
+    name: str
+    unit: str
+    stock: float
+    min_stock: float
+    suggested_qty: float
+    unit_price: int
+    est_cost: int
 
 
 # ---------- Sales ----------

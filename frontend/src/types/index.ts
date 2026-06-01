@@ -30,6 +30,34 @@ export interface CashFlow {
   id: string; direction: "in" | "out"; amount: number;
   category: string | null; note: string | null; occurred_at: string;
 }
+export type MoveType = "buy" | "produce" | "use" | "sale" | "adjust" | "writeoff" | "return" | "manual";
+export interface Movement {
+  id: string; item_type: "product" | "raw"; item_id: string;
+  item_name: string; item_category: string | null; unit: string | null;
+  move_type: MoveType; delta: number; balance_after: number;
+  unit_cost: number; cost: number;
+  ref_type: string | null; note: string | null; occurred_at: string;
+}
+export interface RecipeLine { material_id: string; qty: number; }
+export interface Recipe {
+  product_id: string; items: RecipeLine[]; cost_estimate: number;
+}
+export interface Production {
+  id: string; product_id: string; product_name: string;
+  qty: number; cost_total: number; unit_cost: number;
+  note: string | null; occurred_at: string;
+}
+export interface Batch {
+  id: string; item_type: "product" | "raw"; item_id: string; item_name: string;
+  qty_initial: number; qty_remaining: number; unit: string | null;
+  production_date: string | null; expiry_date: string | null;
+  unit_cost: number; is_active: boolean;
+}
+export interface ReorderItem {
+  item_type: "product" | "raw"; item_id: string; name: string; unit: string;
+  stock: number; min_stock: number; suggested_qty: number;
+  unit_price: number; est_cost: number;
+}
 export interface DashboardData {
   today_revenue: number; today_count: number; month_revenue: number;
   balance: number; month_in: number; month_out: number; nasiya_total: number;

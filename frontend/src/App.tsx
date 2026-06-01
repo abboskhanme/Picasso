@@ -4,6 +4,7 @@ import Shell from "@/components/layout/Shell";
 import LoginPage from "@/features/auth/LoginPage";
 import DashboardPage from "@/features/dashboard/DashboardPage";
 import SalesPage from "@/features/sales/SalesPage";
+import ZaxiraPage from "@/features/stock/ZaxiraPage";
 import StockPage from "@/features/stock/StockPage";
 import SetsPage from "@/features/sets/SetsPage";
 import NasiyaPage from "@/features/nasiya/NasiyaPage";
@@ -22,6 +23,7 @@ export default function App() {
         <Route element={<Protected />}>
           <Route path="/" element={<DashboardPage />} />
           <Route path="/sotuv" element={<SalesPage />} />
+          <Route path="/zaxira" element={<ZaxiraPage />} />
           <Route path="/ombor" element={<StockPage />} />
           <Route path="/toplamlar" element={<SetsPage />} />
           <Route path="/nasiya" element={<NasiyaPage />} />

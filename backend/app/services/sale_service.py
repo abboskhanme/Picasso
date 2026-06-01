@@ -2,6 +2,7 @@
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
 from .. import models, schemas
+from . import inventory_service as inv
 
 
 def create_sale(db: Session, data: schemas.SaleCreate) -> models.Sale:
@@ -26,13 +27,19 @@ def create_sale(db: Session, data: schemas.SaleCreate) -> models.Sale:
         sale.set_id = pset.id
         total = pset.price
         # to'plam tarkibidagi har mahsulot stokini kamaytir
+        sale.items = []
+        db.add(sale)
+        db.flush()  # sale.id kerak (jurnal ref uchun)
         for it in pset.items:
             prod = db.get(models.Product, it.product_id)
             if not prod:
                 continue
-            if float(prod.stock) < float(it.qty):
-                raise HTTPException(400, f"Omborda yetarli emas: {prod.name}")
-            prod.stock = float(prod.stock) - float(it.qty)
+            inv.apply_movement(
+                db, item=prod, item_type="product", delta=-float(it.qty), move_type="sale",
+                unit_cost=int(prod.price), cost=int(round(prod.price * float(it.qty))),
+                ref_type="sale", ref_id=sale.id, note=f"To'plam: {pset.name}",
+            )
+            inv.consume_fefo(db, "product", prod.id, float(it.qty))
             item_rows.append(models.SaleItem(
                 product_id=prod.id, name_snapshot=prod.name, emoji_snapshot=prod.emoji,
                 qty=it.qty, unit_price=int(prod.price), line_total=int(round(prod.price * float(it.qty))),
@@ -40,24 +47,29 @@ def create_sale(db: Session, data: schemas.SaleCreate) -> models.Sale:
     else:
         if not data.items:
             raise HTTPException(400, "Mahsulot tanlanmagan")
+        sale.items = []
+        db.add(sale)
+        db.flush()  # sale.id kerak
         for it in data.items:
             prod = db.get(models.Product, it.product_id)
             if not prod:
                 raise HTTPException(404, "Mahsulot topilmadi")
-            if float(prod.stock) < float(it.qty):
-                raise HTTPException(400, f"Omborda yetarli emas: {prod.name} ({prod.stock} {prod.unit})")
-            prod.stock = float(prod.stock) - float(it.qty)
             line = int(round(it.unit_price * float(it.qty)))
             total += line
+            inv.apply_movement(
+                db, item=prod, item_type="product", delta=-float(it.qty), move_type="sale",
+                unit_cost=int(it.unit_price), cost=line, ref_type="sale", ref_id=sale.id,
+            )
+            inv.consume_fefo(db, "product", prod.id, float(it.qty))
             item_rows.append(models.SaleItem(
                 product_id=prod.id, name_snapshot=prod.name, emoji_snapshot=prod.emoji,
                 qty=it.qty, unit_price=it.unit_price, line_total=line,
             ))
 
     sale.total = total
-    sale.items = item_rows
-    db.add(sale)
-    db.flush()  # sale.id kerak
+    for row in item_rows:
+        row.sale_id = sale.id
+        db.add(row)
 
     if data.payment_method == "nasiya":
         if not data.customer_name or not data.customer_phone:

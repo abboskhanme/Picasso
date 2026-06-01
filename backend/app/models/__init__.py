@@ -140,3 +140,80 @@ class CashFlow(Base):
     note: Mapped[str | None] = mapped_column(Text, nullable=True)
     sale_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("sales.id"), nullable=True)
     occurred_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+# ============================================================
+#  Universal harakatlar jurnali — HAR QANDAY stok o'zgarishi shu yerga yoziladi.
+#  item_type: 'product' (tayyor mahsulot) | 'raw' (xomashyo/qadoqlash)
+#  move_type: buy | produce | use | sale | adjust | writeoff | return | manual
+#  delta: ishorali o'zgarish (+ kirim, - chiqim)
+#  balance_after: harakatdan keyingi qoldiq — istalgan vaqtdagi holatni tiklash uchun
+# ============================================================
+class InventoryMovement(Base):
+    __tablename__ = "inventory_movements"
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=_uuid)
+    item_type: Mapped[str] = mapped_column(String, index=True)      # product | raw
+    item_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), index=True)
+    item_name: Mapped[str] = mapped_column(String)                  # tarix uchun nom snapshot
+    item_category: Mapped[str | None] = mapped_column(String, nullable=True)  # xomashyo/qadoqlash/guruh
+    unit: Mapped[str | None] = mapped_column(String, nullable=True)
+    move_type: Mapped[str] = mapped_column(String, index=True)
+    delta: Mapped[float] = mapped_column(Numeric(12, 3))            # ishorali
+    balance_after: Mapped[float] = mapped_column(Numeric(12, 3))
+    unit_cost: Mapped[int] = mapped_column(BigInteger, default=0)
+    cost: Mapped[int] = mapped_column(BigInteger, default=0)        # umumiy summa (so'm)
+    ref_type: Mapped[str | None] = mapped_column(String, nullable=True)  # sale | production | purchase | count
+    ref_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
+    note: Mapped[str | None] = mapped_column(Text, nullable=True)
+    occurred_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), index=True)
+    created_by: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id"), nullable=True)
+
+
+# ============================================================
+#  Retsept (BOM) — 1 dona tayyor mahsulot uchun qancha xomashyo/qadoqlash kerak
+# ============================================================
+class ProductRecipe(Base):
+    __tablename__ = "product_recipes"
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=_uuid)
+    product_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("products.id", ondelete="CASCADE"), index=True)
+    material_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("raw_materials.id", ondelete="CASCADE"))
+    qty: Mapped[float] = mapped_column(Numeric(12, 3))  # 1 dona mahsulotga ketadigan miqdor
+    product: Mapped["Product"] = relationship()
+    material: Mapped["RawMaterial"] = relationship()
+
+
+# ============================================================
+#  Ishlab chiqarish partiyasi
+# ============================================================
+class Production(Base):
+    __tablename__ = "productions"
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=_uuid)
+    product_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("products.id"))
+    product_name: Mapped[str] = mapped_column(String)
+    qty: Mapped[float] = mapped_column(Numeric(12, 2))            # ishlab chiqarilgan miqdor
+    cost_total: Mapped[int] = mapped_column(BigInteger, default=0)  # sarflangan xomashyo tannarxi
+    unit_cost: Mapped[int] = mapped_column(BigInteger, default=0)   # 1 donaga tannarx
+    note: Mapped[str | None] = mapped_column(Text, nullable=True)
+    occurred_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    created_by: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id"), nullable=True)
+
+
+# ============================================================
+#  Partiya / muddat (yaroqlilik) kuzatuvi — FEFO uchun
+#  buy (xomashyo) yoki produce (mahsulot) paytida muddat kiritilsa yaratiladi.
+# ============================================================
+class Batch(Base):
+    __tablename__ = "batches"
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=_uuid)
+    item_type: Mapped[str] = mapped_column(String, index=True)   # product | raw
+    item_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), index=True)
+    item_name: Mapped[str] = mapped_column(String)
+    qty_initial: Mapped[float] = mapped_column(Numeric(12, 3))
+    qty_remaining: Mapped[float] = mapped_column(Numeric(12, 3))
+    unit: Mapped[str | None] = mapped_column(String, nullable=True)
+    production_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+    expiry_date: Mapped[date | None] = mapped_column(Date, nullable=True, index=True)
+    unit_cost: Mapped[int] = mapped_column(BigInteger, default=0)
+    note: Mapped[str | None] = mapped_column(Text, nullable=True)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

@@ -1,0 +1,79 @@
+# Picasso ERP — DEVELOPMENT (hot-reload)
+# Kod o'zgarganda avtomatik yangilanadi — qayta build SHART EMAS.
+#
+# Ishga tushirish (bir marta):
+#   docker compose -f docker-compose.dev.yml up
+#   (yoki fonda:  docker compose -f docker-compose.dev.yml up -d)
+#
+# Manzillar (boshqa loyihalar bilan to'qnashmasligi uchun maxsus portlar):
+#   Frontend (sayt):  http://localhost:5174
+#   Backend  (API):   http://localhost:8002
+#   Postgres:         localhost:5434
+#
+# To'xtatish:  docker compose -f docker-compose.dev.yml down
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: picasso_db_dev
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-picasso}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-picasso_secret}
+      POSTGRES_DB: ${POSTGRES_DB:-picasso}
+    ports:
+      - "5434:5432"
+    volumes:
+      - pgdata_dev:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-picasso}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    build: ./backend
+    container_name: picasso_backend_dev
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-picasso}:${POSTGRES_PASSWORD:-picasso_secret}@db:5432/${POSTGRES_DB:-picasso}
+      JWT_SECRET: ${JWT_SECRET:-dev_secret}
+      SEED_ON_START: "true"
+    ports:
+      - "8002:8000"
+    # Kodni volume orqali ulash — image ichiga "muhrlash" o'rniga jonli ulaymiz
+    volumes:
+      - ./backend/app:/code/app
+    # --reload: app/ ichidagi .py fayl o'zgarsa, server avtomatik qayta yuklanadi
+    command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+
+  frontend:
+    image: node:20-alpine
+    container_name: picasso_frontend_dev
+    restart: unless-stopped
+    working_dir: /app
+    depends_on:
+      - backend
+    environment:
+      # Brauzer same-origin /api ga so'rov yuboradi; Vite uni backendga proxy qiladi
+      # (prod'dagi Caddy kabi). Shunday qilib host port raqami ahamiyatsiz — Failed to fetch bo'lmaydi.
+      VITE_API_URL: /api
+      # Vite proxy backendni konteyner tarmog'idagi nomi orqali topadi
+      VITE_PROXY_TARGET: http://backend:8000
+      # Docker volume mount'da fayl o'zgarishini ishonchli aniqlash uchun (HMR)
+      CHOKIDAR_USEPOLLING: "true"
+    ports:
+      - "5174:5173"
+    # Manba kodini ulaymiz, lekin node_modules ni konteyner ichida saqlaymiz
+    volumes:
+      - ./frontend:/app
+      - frontend_node_modules:/app/node_modules
+    # Birinchi ishga tushishda paketlarni o'rnatadi, keyin Vite dev serverni
+    # hot-reload bilan ishga tushiradi (HMR — sahifa o'zi yangilanadi)
+    command: sh -c "npm install && npm run dev -- --host 0.0.0.0 --port 5173"
+
+volumes:
+  pgdata_dev:
+  frontend_node_modules:

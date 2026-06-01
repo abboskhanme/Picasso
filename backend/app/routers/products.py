@@ -4,6 +4,7 @@ from sqlalchemy.orm import Session
 from .. import models, schemas
 from ..database import get_db
 from ..deps import get_current_user
+from ..services import inventory_service as inv
 
 router = APIRouter(prefix="/products", tags=["products"], dependencies=[Depends(get_current_user)])
 
@@ -14,9 +15,15 @@ def list_products(db: Session = Depends(get_db)):
 
 
 @router.post("", response_model=schemas.ProductOut)
-def create_product(data: schemas.ProductCreate, db: Session = Depends(get_db)):
-    p = models.Product(**data.model_dump())
-    db.add(p); db.commit(); db.refresh(p)
+def create_product(data: schemas.ProductCreate, user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
+    payload = data.model_dump()
+    initial = float(payload.pop("stock", 0) or 0)
+    p = models.Product(stock=0, **payload)
+    db.add(p); db.flush()
+    if initial > 0:
+        inv.apply_movement(db, item=p, item_type="product", delta=initial, move_type="adjust",
+                           note="Boshlang'ich qoldiq", created_by=user.id)
+    db.commit(); db.refresh(p)
     return p
 
 
@@ -32,11 +39,17 @@ def update_product(pid: uuid.UUID, data: schemas.ProductUpdate, db: Session = De
 
 
 @router.post("/{pid}/stock", response_model=schemas.ProductOut)
-def update_stock(pid: uuid.UUID, data: schemas.StockUpdate, db: Session = Depends(get_db)):
+def update_stock(pid: uuid.UUID, data: schemas.StockUpdate,
+                 user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
     p = db.get(models.Product, pid)
     if not p:
         raise HTTPException(404, "Mahsulot topilmadi")
-    p.stock = (float(p.stock) + data.qty) if data.mode == "add" else data.qty
+    if data.mode == "set":
+        inv.adjust(db, item=p, item_type="product", actual_qty=data.qty,
+                   note="Qoldiq o'rnatildi", created_by=user.id)
+    else:
+        inv.apply_movement(db, item=p, item_type="product", delta=data.qty, move_type="manual",
+                           note="Qo'lda kirim", created_by=user.id, allow_negative=True)
     db.commit(); db.refresh(p)
     return p
 
