@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Plus, ArrowDownLeft, ArrowUpRight, Check, Wallet, Scale } from "lucide-react";
 import { api, fmt } from "@/lib/api";
 import { CashFlow } from "@/types";
-import { Card, PageHeader, Section, StatCard, Button, Empty, Spinner, Modal, Field, Input, Segmented, ErrorBox, cx } from "@/components/ui";
+import { Card, PageHeader, Section, StatCard, Button, Empty, Spinner, Modal, Field, Input, Segmented, ErrorBox, MoneyInput, cx } from "@/components/ui";
 
 const OUT_CATS = ["Ijara", "Maosh", "Xom ashyo", "Qadoqlash", "Kommunal", "Reklama", "Boshqa xarajat"];
 const IN_CATS = ["Investitsiya", "Qo'shimcha kirim"];
@@ -100,7 +100,7 @@ function FlowModal({ onClose, onSaved }: { onClose: () => void; onSaved: () => v
         </div>
       </Field>
 
-      <Field label="Summa (so'm)"><Input type="number" min={0} value={amount} onChange={(e) => setAmount(+e.target.value)} /></Field>
+      <Field label="Summa (so'm)"><MoneyInput value={amount} onChange={setAmount} /></Field>
       <Field label="Izoh (ixtiyoriy)"><Input value={note} onChange={(e) => setNote(e.target.value)} placeholder="masalan: May oyi ijarasi" /></Field>
     </Modal>
   );

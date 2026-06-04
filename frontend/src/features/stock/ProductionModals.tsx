@@ -123,7 +123,7 @@ export function ProduceModal({ product, onClose, onSaved }:
             {qty > 0 && !enough && <p className="text-2xs text-danger-fg mt-1.5 font-medium">Ba'zi xomashyo yetarli emas.</p>}
           </div>
           <Field label="Yaroqlilik muddati (ixtiyoriy)"><Input type="date" value={expiry} onChange={(e) => setExpiry(e.target.value)} /></Field>
-          <Field label="Izoh (ixtiyoriy)"><Input value={note} onChange={(e) => setNote(e.target.value)} placeholder="masalan: tunги smena" /></Field>
+          <Field label="Izoh (ixtiyoriy)"><Input value={note} onChange={(e) => setNote(e.target.value)} placeholder="masalan: tungi smena" /></Field>
         </>
       )}
     </Modal>

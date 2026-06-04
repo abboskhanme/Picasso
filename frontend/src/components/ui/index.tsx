@@ -1,6 +1,7 @@
 import { ReactNode } from "react";
 import type { LucideIcon } from "lucide-react";
 import { X, Loader2, AlertCircle, Inbox, ChevronDown } from "lucide-react";
+import { PHONE_COUNTRIES, groupNational, phoneCountry } from "@/lib/api";
 
 /* ---------- utils ---------- */
 export const cx = (...parts: (string | false | null | undefined)[]) => parts.filter(Boolean).join(" ");
@@ -194,6 +195,89 @@ export function Select(props: React.SelectHTMLAttributes<HTMLSelectElement>) {
     </div>
   );
 }
+
+/* ---------- pul (so'm) kiritish ---------- */
+const groupDigits = (s: string) => s.replace(/\B(?=(\d{3})+(?!\d))/g, " ");
+
+/** Yozish davomida raqamlarni avtomatik guruhlaydi (25 000).
+ *  "." yoki "," bosilsa — uchta nol qo'shiladi (×1000). O'ng tomondagi «000» tugmasi ham shuni qiladi. */
+export function MoneyInput({ value, onChange, className, placeholder, compact }:
+  { value: number; onChange: (n: number) => void; className?: string; placeholder?: string; compact?: boolean }) {
+  const parse = (s: string) => {
+    const d = s.replace(/\D/g, "").slice(0, 12);
+    return d ? +d : 0;
+  };
+  const x1000 = () => { if (value > 0 && value < 1_000_000_000) onChange(value * 1000); };
+  return (
+    <div className="relative w-full">
+      <input
+        inputMode="numeric"
+        value={value > 0 ? groupDigits(String(Math.round(value))) : ""}
+        placeholder={placeholder ?? "0"}
+        onChange={(e) => onChange(parse(e.target.value))}
+        onKeyDown={(e) => { if (e.key === "." || e.key === ",") { e.preventDefault(); x1000(); } }}
+        className={cx(compact
+          ? "w-full h-7 px-2 pr-8 rounded-md border border-border text-[11px] nums outline-none focus:border-brand-500"
+          : cx(fieldCls, "pr-10 nums"), className)}
+      />
+      <button type="button" tabIndex={-1} onClick={x1000} title="Uchta nol qo'shish (×1000)"
+        className={cx("absolute top-1/2 -translate-y-1/2 rounded text-faint hover:text-brand-700 hover:bg-brand-50 font-bold nums transition-colors",
+          compact ? "right-1 h-5 px-1 text-[9px]" : "right-1.5 h-6 px-1.5 text-[10px]")}>
+        000
+      </button>
+    </div>
+  );
+}
+
+/* ---------- telefon kiritish ---------- */
+
+/** Telefon raqam: O'rta Osiyo davlatini tanlash mumkin (🇺🇿 🇰🇿 🇰🇬 🇹🇯 🇹🇲),
+ *  raqamlar yozish davomida davlat shabloni bo'yicha guruhlanadi.
+ *  value sifatida to'liq "+998976662675" saqlanadi. */
+export function PhoneInput({ value, onChange, className }:
+  { value: string; onChange: (v: string) => void; className?: string }) {
+  const allDigits = value.replace(/\D/g, "");
+  const country =
+    [...PHONE_COUNTRIES].sort((a, b) => b.dial.length - a.dial.length).find((c) => allDigits.startsWith(c.dial)) ?? PHONE_COUNTRIES[0];
+  const national = (allDigits.startsWith(country.dial) ? allDigits.slice(country.dial.length) : "").slice(0, country.len);
+  const emit = (dial: string, nat: string) => onChange(nat ? "+" + dial + nat : "");
+
+  return (
+    <div className={cx("flex items-center w-full h-9 rounded-btn border border-border bg-card transition-shadow focus-within:border-brand-500 focus-within:shadow-focus", className)}>
+      <div className="relative h-full shrink-0">
+        <select
+          value={country.code}
+          onChange={(e) => {
+            const next = PHONE_COUNTRIES.find((c) => c.code === e.target.value)!;
+            emit(next.dial, national.slice(0, next.len));
+          }}
+          className="appearance-none h-full pl-3 pr-6 bg-transparent text-[13px] font-medium text-muted nums outline-none cursor-pointer"
+          title={country.name}
+        >
+          {PHONE_COUNTRIES.map((c) => (
+            <option key={c.code} value={c.code}>{c.flag} +{c.dial}</option>
+          ))}
+        </select>
+        <ChevronDown size={13} className="text-faint absolute right-1.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+      </div>
+      <input
+        type="tel" inputMode="numeric"
+        value={groupNational(national, country.groups)}
+        placeholder={country.example}
+        onChange={(e) => {
+          let d = e.target.value.replace(/\D/g, "");
+          if (d.startsWith(country.dial) && d.length > country.len) d = d.slice(country.dial.length);
+          d = d.slice(0, country.len);
+          emit(country.dial, d);
+        }}
+        className="flex-1 min-w-0 h-full px-2 bg-transparent text-[13px] text-ink placeholder:text-faint outline-none nums"
+      />
+    </div>
+  );
+}
+
+/** Telefon raqam tanlangan davlat uchun to'liq kiritilganmi */
+export const isPhoneComplete = (v: string) => !!phoneCountry(v.replace(/\D/g, ""));
 
 export function ErrorBox({ message }: { message?: string }) {
   if (!message) return null;

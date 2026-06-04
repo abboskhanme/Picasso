@@ -5,8 +5,8 @@ import { login } from "@/lib/api";
 import { Button, Field, Input, ErrorBox } from "@/components/ui";
 
 export default function LoginPage() {
-  const [email, setEmail] = useState("admin@picasso.uz");
-  const [password, setPassword] = useState("admin123");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [err, setErr] = useState("");
   const [loading, setLoading] = useState(false);
   const nav = useNavigate();
@@ -40,8 +40,6 @@ export default function LoginPage() {
             <LogIn size={16} /> {loading ? "Kirilmoqda…" : "Kirish"}
           </Button>
         </form>
-
-        <p className="text-center text-2xs text-faint mt-4">Demo hisob: admin@picasso.uz / admin123</p>
       </div>
     </div>
   );

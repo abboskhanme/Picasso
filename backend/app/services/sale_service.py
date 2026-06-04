@@ -5,6 +5,29 @@ from .. import models, schemas
 from . import inventory_service as inv
 
 
+def _consume_set_packaging(db: Session, sale: models.Sale, pset: models.ProductSet) -> None:
+    """To'plam sotilganda qadoqlash materiallarining har biridan 1 dona ayiradi.
+
+    Qadoqlash hisobi sotuvni to'xtatmasligi uchun qoldiq manfiy bo'lishiga
+    ruxsat beriladi — kamomad ombor jurnalida ko'rinib turadi.
+    """
+    packaging = (
+        db.query(models.RawMaterial)
+        .filter_by(category="qadoqlash", is_active=True)
+        .all()
+    )
+    for mat in packaging:
+        unit_price = int(mat.unit_price or 0)
+        inv.apply_movement(
+            db, item=mat, item_type="raw", delta=-1.0, move_type="use",
+            unit_cost=unit_price, cost=unit_price,
+            ref_type="sale", ref_id=sale.id,
+            note=f"To'plam qadoqlash: {pset.name}",
+            allow_negative=True,
+        )
+        inv.consume_fefo(db, "raw", mat.id, 1.0)
+
+
 def create_sale(db: Session, data: schemas.SaleCreate) -> models.Sale:
     sale = models.Sale(
         kind=data.kind,
@@ -44,6 +67,9 @@ def create_sale(db: Session, data: schemas.SaleCreate) -> models.Sale:
                 product_id=prod.id, name_snapshot=prod.name, emoji_snapshot=prod.emoji,
                 qty=it.qty, unit_price=int(prod.price), line_total=int(round(prod.price * float(it.qty))),
             ))
+        # Har bir sotilgan to'plamga qadoqlash materiallaridan 1 donadan sarflanadi
+        # (karobka, pergament, lenta, sticker, kraft sumkacha, shtrix kod va h.k.)
+        _consume_set_packaging(db, sale, pset)
     else:
         if not data.items:
             raise HTTPException(400, "Mahsulot tanlanmagan")

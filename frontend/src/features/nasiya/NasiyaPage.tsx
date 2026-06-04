@@ -1,9 +1,9 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Phone, HandCoins, Check, CheckCircle2 } from "lucide-react";
-import { api, fmt } from "@/lib/api";
+import { api, fmt, fmtPhone } from "@/lib/api";
 import { CustomerBalance } from "@/types";
-import { Card, PageHeader, Section, StatCard, Button, Empty, Spinner, Modal, Field, Input, ErrorBox, cx } from "@/components/ui";
+import { Card, PageHeader, Section, StatCard, Button, Empty, Spinner, Modal, Field, Input, ErrorBox, MoneyInput, cx } from "@/components/ui";
 
 export default function NasiyaPage() {
   const { data, isLoading } = useQuery({ queryKey: ["nasiya"], queryFn: () => api.get<CustomerBalance[]>("/nasiya") });
@@ -33,7 +33,7 @@ export default function NasiyaPage() {
               <div className="flex justify-between items-start gap-3">
                 <div className="min-w-0">
                   <div className="font-semibold text-ink truncate">{c.name}</div>
-                  <div className="text-2xs text-muted flex items-center gap-1 mt-0.5"><Phone size={12} /> {c.phone || "—"}</div>
+                  <div className="text-2xs text-muted flex items-center gap-1 mt-0.5 nums"><Phone size={12} /> {fmtPhone(c.phone)}</div>
                 </div>
                 <Button variant="ok" size="sm" onClick={() => setPayTarget(c)}>To'lov qabul qilish</Button>
               </div>
@@ -81,7 +81,7 @@ function PayModal({ customer, onClose, onSaved }: { customer: CustomerBalance; o
         <div className="text-[20px] font-bold text-danger-fg nums">{fmt(customer.debt)}</div>
       </div>
 
-      <Field label="To'lov summasi (so'm)"><Input type="number" min={0} max={customer.debt} value={amount} onChange={(e) => setAmount(+e.target.value)} /></Field>
+      <Field label="To'lov summasi (so'm)"><MoneyInput value={amount} onChange={setAmount} /></Field>
       <div className="flex gap-2 -mt-1.5 mb-3.5">
         <button onClick={() => setAmount(Math.round(customer.debt / 2))} className="flex-1 h-8 rounded-btn bg-sunken border border-border text-[12px] font-medium text-body hover:bg-card transition-colors">Yarmi</button>
         <button onClick={() => setAmount(customer.debt)} className="flex-1 h-8 rounded-btn bg-sunken border border-border text-[12px] font-medium text-body hover:bg-card transition-colors">To'liq</button>

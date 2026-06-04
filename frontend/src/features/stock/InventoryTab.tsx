@@ -9,7 +9,7 @@ import { api, fmt, fmtShort } from "@/lib/api";
 import type { Product, RawMaterial } from "@/types";
 import {
   Card, Section, StatCard, Button, IconButton, Badge, Empty, Spinner,
-  Modal, Field, Input, Textarea, Select, Segmented, ErrorBox, cx,
+  Modal, Field, Input, Textarea, Select, Segmented, ErrorBox, MoneyInput, cx,
 } from "@/components/ui";
 import { toast, ConfirmDialog } from "@/components/ui/toast";
 import { stockState, SortKey, SORT_OPTIONS, sortAndFilter, unitLabel, nf, StockBar } from "./lib";
@@ -205,7 +205,7 @@ function RawForm({ category, item, onClose, onSaved }:
             {units.map((u) => <option key={u.v} value={u.v}>{u.l}</option>)}
           </Select></Field></div>
         <div className="flex-1"><Field label={`Narx (so'm / ${unitLabel(unit)})`}>
-          <Input type="number" min={0} value={unitPrice} onChange={(e) => setUnitPrice(+e.target.value)} /></Field></div>
+          <MoneyInput value={unitPrice} onChange={setUnitPrice} /></Field></div>
       </div>
       <div className="flex gap-3">
         {!item && <div className="flex-1"><Field label={`Boshlang'ich miqdor (${unitLabel(unit)})`}>
@@ -240,7 +240,7 @@ function RawMoveModal({ item, mode, onClose, onSaved }:
       <Field label={`Miqdor (${u})`}><Input type="number" min={0} value={qty} onChange={(e) => setQty(+e.target.value)} /></Field>
       {mode === "buy" ? (
         <>
-          <Field label="Umumiy narx (so'm)"><Input type="number" min={0} value={cost} onChange={(e) => setCost(+e.target.value)} /></Field>
+          <Field label="Umumiy narx (so'm)"><MoneyInput value={cost} onChange={setCost} /></Field>
           <Field label="Yaroqlilik muddati (ixtiyoriy)"><Input type="date" value={expiry} onChange={(e) => setExpiry(e.target.value)} /></Field>
           <Field label="Izoh (ixtiyoriy)"><Input value={note} onChange={(e) => setNote(e.target.value)} placeholder="masalan: hujjat raqami" /></Field>
         </>
@@ -393,8 +393,8 @@ function ProductForm({ item, onClose, onSaved }: { item?: Product; onClose: () =
       <Field label="Guruh / kategoriya"><Input value={category} onChange={(e) => setCategory(e.target.value)} placeholder="masalan: Oq shokolad, Truffel" /></Field>
       <Field label="Tarkibi / tavsifi"><Textarea rows={2} value={description} onChange={(e) => setDescription(e.target.value)} placeholder="masalan: Oq shokolad + bodom" /></Field>
       <div className="flex gap-3">
-        <div className="flex-1"><Field label="Tannarx (so'm)" hint="Retsept bo'lsa, ishlab chiqarishda avtomatik yangilanadi"><Input type="number" min={0} value={costPrice} onChange={(e) => setCostPrice(+e.target.value)} /></Field></div>
-        <div className="flex-1"><Field label="Sotish narxi (so'm)"><Input type="number" min={0} value={price} onChange={(e) => setPrice(+e.target.value)} /></Field></div>
+        <div className="flex-1"><Field label="Tannarx (so'm)" hint="Retsept bo'lsa, ishlab chiqarishda avtomatik yangilanadi"><MoneyInput value={costPrice} onChange={setCostPrice} /></Field></div>
+        <div className="flex-1"><Field label="Sotish narxi (so'm)"><MoneyInput value={price} onChange={setPrice} /></Field></div>
       </div>
       <div className="flex gap-3">
         <div className="flex-1"><Field label="O'lchov"><Select value={unit} onChange={(e) => setUnit(e.target.value)}>{PROD_UNITS.map((u) => <option key={u.v} value={u.v}>{u.l}</option>)}</Select></Field></div>

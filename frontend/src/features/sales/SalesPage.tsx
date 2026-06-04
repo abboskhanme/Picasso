@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Plus, Minus, Trash2, ShoppingCart, Check } from "lucide-react";
 import { api, fmt } from "@/lib/api";
 import { Sale, Product, ProductSet, PaymentMethod } from "@/types";
-import { Card, PageHeader, Button, Badge, Empty, Spinner, Modal, Field, Input, Segmented, ErrorBox, cx } from "@/components/ui";
+import { Card, PageHeader, Button, Badge, Empty, Spinner, Modal, Field, Input, Segmented, ErrorBox, MoneyInput, PhoneInput, isPhoneComplete, cx } from "@/components/ui";
 
 const payTone: Record<string, string> = { naqd: "g", karta: "b", nasiya: "o" };
 const payLabel: Record<string, string> = { naqd: "Naqd", karta: "Karta", nasiya: "Nasiya" };
@@ -85,7 +85,7 @@ function AddSaleModal({ onClose, onSaved }: { onClose: () => void; onSaved: () =
     onSuccess: onSaved,
   });
 
-  const canSave = (mode === "set" ? !!setId : cart.length > 0) && (pay !== "nasiya" || (cName && cPhone)) && !mut.isPending;
+  const canSave = (mode === "set" ? !!setId : cart.length > 0) && (pay !== "nasiya" || (cName && isPhoneComplete(cPhone))) && !mut.isPending;
 
   return (
     <Modal title="Yangi sotuv" onClose={onClose}
@@ -132,8 +132,7 @@ function AddSaleModal({ onClose, onSaved }: { onClose: () => void; onSaved: () =
                   <div className="flex-1 min-w-0">
                     <div className="text-[12.5px] font-medium text-ink truncate">{l.name}</div>
                     <div className="flex items-center gap-1 mt-1">
-                      <input type="number" value={l.unit_price} onChange={(e) => setPrice(l.product_id, +e.target.value)}
-                        className="w-24 h-7 px-2 rounded-md border border-border text-[11px] nums outline-none focus:border-brand-500" />
+                      <div className="w-28"><MoneyInput compact value={l.unit_price} onChange={(v) => setPrice(l.product_id, v)} /></div>
                       <span className="text-2xs text-muted">so'm</span>
                     </div>
                   </div>
@@ -177,7 +176,7 @@ function AddSaleModal({ onClose, onSaved }: { onClose: () => void; onSaved: () =
         <div className="rounded-btn border border-warn-bg bg-warn-bg/40 p-3 mb-1">
           <div className="text-[12px] font-semibold text-warn-fg mb-2">Nasiya uchun mijoz ma'lumoti</div>
           <Input placeholder="Mijoz ismi" className="mb-2" value={cName} onChange={(e) => setCName(e.target.value)} />
-          <Input placeholder="Telefon raqami" value={cPhone} onChange={(e) => setCPhone(e.target.value)} />
+          <PhoneInput value={cPhone} onChange={setCPhone} />
         </div>
       )}
     </Modal>

@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Plus, Minus, Trash2, Gift } from "lucide-react";
 import { api, fmt } from "@/lib/api";
 import { Product, ProductSet } from "@/types";
-import { Card, PageHeader, Button, IconButton, Empty, Spinner, Modal, Field, Input, ErrorBox, cx } from "@/components/ui";
+import { Card, PageHeader, Button, IconButton, Empty, Spinner, Modal, Field, Input, ErrorBox, MoneyInput, cx } from "@/components/ui";
 
 export default function SetsPage() {
   const qc = useQueryClient();
@@ -115,7 +115,7 @@ function SetForm({ products, onClose, onSaved }: { products: Product[]; onClose:
       </Field>
 
       <Field label="To'plam narxi (so'm)">
-        <Input type="number" min={0} value={price} onChange={(e) => setPrice(+e.target.value)} />
+        <MoneyInput value={price} onChange={setPrice} />
       </Field>
       {suggested > 0 && (
         <button onClick={() => setPrice(suggested)} className="text-[12px] text-brand-700 font-medium -mt-2 hover:underline">
