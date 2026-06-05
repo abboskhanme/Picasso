@@ -1,3 +1,18 @@
+# ============================================================
+#  Picasso ERP — YAGONA ish muhiti (hot-reload bilan)
+#
+#  Bir marta ishga tushiring:   docker compose up -d
+#  Keyin kod o'zgarganda HECH NARSA qilish shart emas:
+#    • backend  — uvicorn --reload (.py o'zgarsa o'zi qayta yuklanadi)
+#    • frontend — Vite HMR (sahifa o'zi yangilanadi)
+#
+#  Manzillar:
+#    Sayt:      http://localhost:3000
+#    API:       http://localhost:8000
+#    Postgres:  localhost:5432  (ma'lumotlar pgdata volume'da saqlanadi)
+#
+#  Serverga chiqarish uchun alohida: docker-compose.prod.yml (DEPLOY.md)
+# ============================================================
 services:
   db:
     image: postgres:16-alpine
@@ -30,18 +45,34 @@ services:
       SEED_ON_START: "true"
     ports:
       - "8000:8000"
+    # Kod jonli ulanadi — image ichiga muhrlanmaydi
+    volumes:
+      - ./backend/app:/code/app
+    # --reload: .py fayl o'zgarsa server o'zi qayta yuklanadi
+    command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
 
   frontend:
-    build:
-      context: ./frontend
-      args:
-        VITE_API_URL: ${VITE_API_URL:-http://localhost:8000}
+    image: node:20-alpine
     container_name: picasso_frontend
     restart: unless-stopped
+    working_dir: /app
     depends_on:
       - backend
+    environment:
+      # Brauzer same-origin /api ga so'rov yuboradi; Vite uni backendga proxy qiladi
+      VITE_API_URL: /api
+      VITE_PROXY_TARGET: http://backend:8000
+      # Docker volume'da fayl o'zgarishini ishonchli aniqlash (HMR uchun)
+      CHOKIDAR_USEPOLLING: "true"
     ports:
-      - "3000:80"
+      - "3000:5173"
+    # Manba kod jonli ulanadi; node_modules konteyner ichida qoladi
+    volumes:
+      - ./frontend:/app
+      - frontend_node_modules:/app/node_modules
+    # Birinchi startda paketlarni o'rnatadi, keyin Vite dev server (HMR)
+    command: sh -c "npm install && npm run dev -- --host 0.0.0.0 --port 5173"
 
 volumes:
   pgdata:
+  frontend_node_modules:

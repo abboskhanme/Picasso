@@ -9,7 +9,8 @@ import { api, fmt, fmtShort } from "@/lib/api";
 import type { Product, RawMaterial } from "@/types";
 import {
   Card, Section, StatCard, Button, IconButton, Badge, Empty, Spinner,
-  Modal, Field, Input, Textarea, Select, Segmented, ErrorBox, MoneyInput, cx,
+  Modal, Field, Input, Textarea, Dropdown, Segmented, ErrorBox, MoneyInput, cx,
+  DateTimeField, dtToISO, ItemPic, ImagePicker,
 } from "@/components/ui";
 import { toast, ConfirmDialog } from "@/components/ui/toast";
 import { stockState, SortKey, SORT_OPTIONS, sortAndFilter, unitLabel, nf, StockBar } from "./lib";
@@ -50,9 +51,7 @@ function Toolbar({ query, setQuery, sort, setSort }:
         <Input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Nomi bo'yicha qidirish…" className="pl-9" />
       </div>
       <div className="sm:w-56">
-        <Select value={sort} onChange={(e) => setSort(e.target.value as SortKey)}>
-          {SORT_OPTIONS.map((o) => <option key={o.v} value={o.v}>{o.l}</option>)}
-        </Select>
+        <Dropdown value={sort} onChange={(v) => setSort(v as SortKey)} options={SORT_OPTIONS} />
       </div>
     </div>
   );
@@ -201,9 +200,7 @@ function RawForm({ category, item, onClose, onSaved }:
       <Field label="Nomi"><Input value={name} onChange={(e) => setName(e.target.value)} placeholder={category === "qadoqlash" ? "masalan: Sovg'a qutisi" : "masalan: Kakao kukuni"} /></Field>
       <div className="flex gap-3">
         <div className="flex-1"><Field label="O'lchov turi">
-          <Select value={unit} onChange={(e) => setUnit(e.target.value)}>
-            {units.map((u) => <option key={u.v} value={u.v}>{u.l}</option>)}
-          </Select></Field></div>
+          <Dropdown value={unit} onChange={setUnit} options={units} /></Field></div>
         <div className="flex-1"><Field label={`Narx (so'm / ${unitLabel(unit)})`}>
           <MoneyInput value={unitPrice} onChange={setUnitPrice} /></Field></div>
       </div>
@@ -223,12 +220,13 @@ function RawMoveModal({ item, mode, onClose, onSaved }:
   const [cost, setCost] = useState(0);
   const [expiry, setExpiry] = useState("");
   const [note, setNote] = useState("");
+  const [when, setWhen] = useState("");
   const u = unitLabel(item.unit);
 
   const mut = useMutation({
     mutationFn: () => mode === "buy"
-      ? api.post("/stock/raw/buy", { material_id: item.id, qty, cost, expiry_date: expiry || null, note: note || null })
-      : api.post("/stock/raw/use", { material_id: item.id, qty, note: note || null }),
+      ? api.post("/stock/raw/buy", { material_id: item.id, qty, cost, expiry_date: expiry || null, note: note || null, occurred_at: dtToISO(when) })
+      : api.post("/stock/raw/use", { material_id: item.id, qty, note: note || null, occurred_at: dtToISO(when) }),
     onSuccess: onSaved,
   });
 
@@ -240,13 +238,14 @@ function RawMoveModal({ item, mode, onClose, onSaved }:
       <Field label={`Miqdor (${u})`}><Input type="number" min={0} value={qty} onChange={(e) => setQty(+e.target.value)} /></Field>
       {mode === "buy" ? (
         <>
-          <Field label="Umumiy narx (so'm)"><MoneyInput value={cost} onChange={setCost} /></Field>
-          <Field label="Yaroqlilik muddati (ixtiyoriy)"><Input type="date" value={expiry} onChange={(e) => setExpiry(e.target.value)} /></Field>
+          <Field label="Umumiy narx (so'm)"><MoneyInput thousands value={cost} onChange={setCost} /></Field>
+          <Field label="Yaroqlilik muddati (ixtiyoriy)"><DatePicker value={expiry} onChange={setExpiry} /></Field>
           <Field label="Izoh (ixtiyoriy)"><Input value={note} onChange={(e) => setNote(e.target.value)} placeholder="masalan: hujjat raqami" /></Field>
         </>
       ) : (
         <Field label="Izoh (ixtiyoriy)"><Input value={note} onChange={(e) => setNote(e.target.value)} placeholder="masalan: Sut shokoladi uchun" /></Field>
       )}
+      <DateTimeField value={when} onChange={setWhen} />
     </Modal>
   );
 }
@@ -310,7 +309,7 @@ function ProductsTab() {
             return (
               <Card key={p.id} className={cx("!mb-0", st.ring !== "border-border" && st.ring)}>
                 <div className="flex items-start gap-3">
-                  <div className="w-10 h-10 rounded-lg bg-sunken flex items-center justify-center text-xl flex-shrink-0">{p.emoji}</div>
+                  <ItemPic image={p.image_url} emoji={p.emoji} className="w-10 h-10 text-xl" />
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className="font-semibold text-ink">{p.name}</span>
@@ -365,7 +364,7 @@ function ProductsTab() {
 
 function ProductForm({ item, onClose, onSaved }: { item?: Product; onClose: () => void; onSaved: () => void }) {
   const [name, setName] = useState(item?.name ?? "");
-  const [emoji, setEmoji] = useState(item?.emoji ?? "🍫");
+  const [imageUrl, setImageUrl] = useState<string | null>(item?.image_url ?? null);
   const [category, setCategory] = useState(item?.category ?? "");
   const [description, setDescription] = useState(item?.description ?? "");
   const [costPrice, setCostPrice] = useState(item?.cost_price ?? 0);
@@ -376,7 +375,7 @@ function ProductForm({ item, onClose, onSaved }: { item?: Product; onClose: () =
 
   const mut = useMutation({
     mutationFn: () => {
-      const body = { name, emoji, category: category || null, description: description || null, cost_price: costPrice, price, unit, min_stock: minStock };
+      const body = { name, emoji: item?.emoji ?? "🍫", image_url: imageUrl, category: category || null, description: description || null, cost_price: costPrice, price, unit, min_stock: minStock };
       return item ? api.patch(`/products/${item.id}`, body) : api.post("/products", { ...body, stock });
     },
     onSuccess: onSaved,
@@ -387,8 +386,8 @@ function ProductForm({ item, onClose, onSaved }: { item?: Product; onClose: () =
       footer={<Button className="w-full" onClick={() => mut.mutate()} disabled={!name || mut.isPending}>{mut.isPending ? "Saqlanmoqda…" : "Saqlash"}</Button>}>
       <ErrorBox message={mut.isError ? (mut.error as Error).message : undefined} />
       <div className="flex gap-3">
-        <div className="w-20"><Field label="Emoji"><Input value={emoji} onChange={(e) => setEmoji(e.target.value)} className="text-center text-lg" /></Field></div>
-        <div className="flex-1"><Field label="Nomi"><Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Oq shokolad bodomli" /></Field></div>
+        <Field label="Rasm"><ImagePicker value={imageUrl} onChange={setImageUrl} /></Field>
+        <div className="flex-1"><Field label="Nomi" hint="Rasm yuklanmasa, kartochkada 🍫 belgisi ko'rinadi"><Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Oq shokolad bodomli" /></Field></div>
       </div>
       <Field label="Guruh / kategoriya"><Input value={category} onChange={(e) => setCategory(e.target.value)} placeholder="masalan: Oq shokolad, Truffel" /></Field>
       <Field label="Tarkibi / tavsifi"><Textarea rows={2} value={description} onChange={(e) => setDescription(e.target.value)} placeholder="masalan: Oq shokolad + bodom" /></Field>
@@ -397,7 +396,7 @@ function ProductForm({ item, onClose, onSaved }: { item?: Product; onClose: () =
         <div className="flex-1"><Field label="Sotish narxi (so'm)"><MoneyInput value={price} onChange={setPrice} /></Field></div>
       </div>
       <div className="flex gap-3">
-        <div className="flex-1"><Field label="O'lchov"><Select value={unit} onChange={(e) => setUnit(e.target.value)}>{PROD_UNITS.map((u) => <option key={u.v} value={u.v}>{u.l}</option>)}</Select></Field></div>
+        <div className="flex-1"><Field label="O'lchov"><Dropdown value={unit} onChange={setUnit} options={PROD_UNITS} /></Field></div>
         {!item && <div className="flex-1"><Field label="Boshlang'ich qoldiq"><Input type="number" min={0} value={stock} onChange={(e) => setStock(+e.target.value)} /></Field></div>}
         <div className="flex-1"><Field label="Min. zaxira"><Input type="number" min={0} value={minStock} onChange={(e) => setMinStock(+e.target.value)} /></Field></div>
       </div>
@@ -408,8 +407,9 @@ function ProductForm({ item, onClose, onSaved }: { item?: Product; onClose: () =
 function ProductStockModal({ item, onClose, onSaved }: { item: Product; onClose: () => void; onSaved: () => void }) {
   const [mode, setMode] = useState<"add" | "set">("add");
   const [qty, setQty] = useState(0);
+  const [when, setWhen] = useState("");
   const mut = useMutation({
-    mutationFn: () => api.post(`/products/${item.id}/stock`, { mode, qty }),
+    mutationFn: () => api.post(`/products/${item.id}/stock`, { mode, qty, occurred_at: dtToISO(when) }),
     onSuccess: onSaved,
   });
   return (
@@ -422,6 +422,7 @@ function ProductStockModal({ item, onClose, onSaved }: { item: Product; onClose:
           options={[{ value: "add", label: "Qo'shish (+)" }, { value: "set", label: "O'rnatish (=)" }]} />
       </Field>
       <Field label={`Miqdor (${item.unit})`}><Input type="number" value={qty} onChange={(e) => setQty(+e.target.value)} /></Field>
+      <DateTimeField value={when} onChange={setWhen} />
     </Modal>
   );
 }

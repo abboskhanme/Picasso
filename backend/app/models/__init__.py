@@ -27,6 +27,7 @@ class Product(Base):
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=_uuid)
     name: Mapped[str] = mapped_column(String)
     emoji: Mapped[str] = mapped_column(String, default="🍫")
+    image_url: Mapped[str | None] = mapped_column(Text, nullable=True)  # mahsulot rasmi (/uploads/...)
     price: Mapped[int] = mapped_column(BigInteger, default=0)          # sotish narxi, so'm
     cost_price: Mapped[int] = mapped_column(BigInteger, default=0)     # tannarx, so'm
     description: Mapped[str | None] = mapped_column(Text, nullable=True)   # tarkibi/tafsifi
@@ -43,6 +44,7 @@ class ProductSet(Base):
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=_uuid)
     name: Mapped[str] = mapped_column(String)
     emoji: Mapped[str] = mapped_column(String, default="🎁")
+    image_url: Mapped[str | None] = mapped_column(Text, nullable=True)  # to'plam rasmi (/uploads/...)
     price: Mapped[int] = mapped_column(BigInteger, default=0)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
@@ -139,6 +141,10 @@ class CashFlow(Base):
     category: Mapped[str | None] = mapped_column(String, nullable=True)
     note: Mapped[str | None] = mapped_column(Text, nullable=True)
     sale_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("sales.id"), nullable=True)
+    # Qaysi yozuv tufayli yaratilgani (o'chirishda birga qaytarish uchun):
+    # ref_type: movement (ombor kirimi) | nasiya (nasiya to'lovi)
+    ref_type: Mapped[str | None] = mapped_column(String, nullable=True)
+    ref_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
     occurred_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 

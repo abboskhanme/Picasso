@@ -1,9 +1,10 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Plus, ArrowDownLeft, ArrowUpRight, Check, Wallet, Scale } from "lucide-react";
+import { Plus, ArrowDownLeft, ArrowUpRight, Check, Wallet, Scale, Trash2 } from "lucide-react";
 import { api, fmt } from "@/lib/api";
 import { CashFlow } from "@/types";
-import { Card, PageHeader, Section, StatCard, Button, Empty, Spinner, Modal, Field, Input, Segmented, ErrorBox, MoneyInput, cx } from "@/components/ui";
+import { Card, PageHeader, Section, StatCard, Button, Empty, Spinner, Modal, Field, Input, Segmented, ErrorBox, MoneyInput, cx, DateTimeField, dtToISO, DateTime } from "@/components/ui";
+import { toast, ConfirmDialog } from "@/components/ui/toast";
 
 const OUT_CATS = ["Ijara", "Maosh", "Xom ashyo", "Qadoqlash", "Kommunal", "Reklama", "Boshqa xarajat"];
 const IN_CATS = ["Investitsiya", "Qo'shimcha kirim"];
@@ -11,8 +12,22 @@ const IN_CATS = ["Investitsiya", "Qo'shimcha kirim"];
 export default function FinancePage() {
   const qc = useQueryClient();
   const [open, setOpen] = useState(false);
+  const [deleting, setDeleting] = useState<CashFlow | null>(null);
   const bal = useQuery({ queryKey: ["balance"], queryFn: () => api.get<{ balance: number; total_in: number; total_out: number }>("/finance/balance") });
   const flows = useQuery({ queryKey: ["flows"], queryFn: () => api.get<CashFlow[]>("/finance/cash-flows") });
+
+  const refresh = () => {
+    qc.invalidateQueries({ queryKey: ["flows"] });
+    qc.invalidateQueries({ queryKey: ["balance"] });
+    qc.invalidateQueries({ queryKey: ["dashboard"] });
+    qc.invalidateQueries({ queryKey: ["nasiya"] });
+  };
+  const del = useMutation({
+    mutationFn: (id: string) => api.del(`/finance/cash-flows/${id}`),
+    onSuccess: () => { refresh(); toast("Yozuv o'chirildi — balans qaytarildi"); },
+    onError: (e) => toast((e as Error).message, "error", 5000),
+  });
+
   if (bal.isLoading || flows.isLoading) return <Spinner />;
 
   return (
@@ -41,10 +56,19 @@ export default function FinancePage() {
                   </div>
                   <div className="min-w-0">
                     <div className="font-medium text-[13px] text-ink truncate">{c.note || c.category || (c.direction === "in" ? "Kirim" : "Chiqim")}</div>
-                    <div className="text-2xs text-muted nums">{c.category} · {new Date(c.occurred_at).toLocaleDateString("uz-UZ")}</div>
+                    <div className="mt-1 flex items-center gap-1.5 flex-wrap">
+                      {c.category && <span className="text-2xs font-medium text-muted">{c.category}</span>}
+                      <DateTime value={c.occurred_at} />
+                    </div>
                   </div>
                 </div>
-                <div className={cx("font-semibold text-[13px] nums flex-shrink-0", c.direction === "in" ? "text-success-fg" : "text-danger-fg")}>{c.direction === "in" ? "+" : "−"}{fmt(c.amount)}</div>
+                <div className="flex items-center gap-1.5 flex-shrink-0">
+                  <div className={cx("font-semibold text-[13px] nums", c.direction === "in" ? "text-success-fg" : "text-danger-fg")}>{c.direction === "in" ? "+" : "−"}{fmt(c.amount)}</div>
+                  <button onClick={() => setDeleting(c)} title="O'chirish"
+                    className="w-8 h-8 rounded-lg text-faint hover:text-danger hover:bg-danger-bg flex items-center justify-center transition-colors">
+                    <Trash2 size={15} />
+                  </button>
+                </div>
               </div>
             ))}
           </div>
@@ -52,11 +76,19 @@ export default function FinancePage() {
       )}
 
       {open && <FlowModal onClose={() => setOpen(false)} onSaved={() => {
-        qc.invalidateQueries({ queryKey: ["flows"] });
-        qc.invalidateQueries({ queryKey: ["balance"] });
-        qc.invalidateQueries({ queryKey: ["dashboard"] });
+        refresh();
         setOpen(false);
       }} />}
+
+      {deleting && <ConfirmDialog title="Kassa yozuvini o'chirish" danger confirmLabel="O'chirish"
+        message={<>
+          <b>{deleting.note || deleting.category || (deleting.direction === "in" ? "Kirim" : "Chiqim")}</b> —{" "}
+          <b>{fmt(deleting.amount)}</b> yozuvi o'chirilsinmi?<br /><br />
+          Kassa balansi mos ravishda qaytariladi. Sotuv yoki ombor kirimiga bog'liq yozuvlar
+          faqat o'z bo'limida (Sotuvlar / Harakatlar tarixi) o'chiriladi — shunda barcha
+          transaksiyalar birga orqaga qaytadi.
+        </>}
+        onConfirm={() => del.mutate(deleting.id)} onClose={() => setDeleting(null)} />}
     </>
   );
 }
@@ -66,10 +98,11 @@ function FlowModal({ onClose, onSaved }: { onClose: () => void; onSaved: () => v
   const [amount, setAmount] = useState(0);
   const [category, setCategory] = useState("Ijara");
   const [note, setNote] = useState("");
+  const [when, setWhen] = useState("");
 
   const cats = dir === "in" ? IN_CATS : OUT_CATS;
   const mut = useMutation({
-    mutationFn: () => api.post("/finance/cash-flows", { direction: dir, amount, category, note: note || null }),
+    mutationFn: () => api.post("/finance/cash-flows", { direction: dir, amount, category, note: note || null, occurred_at: dtToISO(when) }),
     onSuccess: onSaved,
   });
 
@@ -100,8 +133,9 @@ function FlowModal({ onClose, onSaved }: { onClose: () => void; onSaved: () => v
         </div>
       </Field>
 
-      <Field label="Summa (so'm)"><MoneyInput value={amount} onChange={setAmount} /></Field>
+      <Field label="Summa (so'm)"><MoneyInput thousands value={amount} onChange={setAmount} /></Field>
       <Field label="Izoh (ixtiyoriy)"><Input value={note} onChange={(e) => setNote(e.target.value)} placeholder="masalan: May oyi ijarasi" /></Field>
+      <DateTimeField value={when} onChange={setWhen} />
     </Modal>
   );
 }

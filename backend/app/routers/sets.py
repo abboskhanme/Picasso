@@ -17,7 +17,7 @@ def list_sets(db: Session = Depends(get_db)):
 def create_set(data: schemas.SetCreate, db: Session = Depends(get_db)):
     if not data.items:
         raise HTTPException(400, "Kamida 1 ta mahsulot tanlang")
-    pset = models.ProductSet(name=data.name, emoji=data.emoji, price=data.price)
+    pset = models.ProductSet(name=data.name, emoji=data.emoji, image_url=data.image_url, price=data.price)
     pset.items = [models.ProductSetItem(product_id=i.product_id, qty=i.qty) for i in data.items]
     db.add(pset); db.commit(); db.refresh(pset)
     return pset

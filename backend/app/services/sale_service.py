@@ -23,7 +23,7 @@ def _consume_set_packaging(db: Session, sale: models.Sale, pset: models.ProductS
             unit_cost=unit_price, cost=unit_price,
             ref_type="sale", ref_id=sale.id,
             note=f"To'plam qadoqlash: {pset.name}",
-            allow_negative=True,
+            allow_negative=True, occurred_at=sale.occurred_at,
         )
         inv.consume_fefo(db, "raw", mat.id, 1.0)
 
@@ -35,6 +35,8 @@ def create_sale(db: Session, data: schemas.SaleCreate) -> models.Sale:
         note=data.note,
         total=0,
     )
+    if data.occurred_at:
+        sale.occurred_at = data.occurred_at
 
     total = 0
     item_rows: list[models.SaleItem] = []
@@ -61,6 +63,7 @@ def create_sale(db: Session, data: schemas.SaleCreate) -> models.Sale:
                 db, item=prod, item_type="product", delta=-float(it.qty), move_type="sale",
                 unit_cost=int(prod.price), cost=int(round(prod.price * float(it.qty))),
                 ref_type="sale", ref_id=sale.id, note=f"To'plam: {pset.name}",
+                occurred_at=sale.occurred_at,
             )
             inv.consume_fefo(db, "product", prod.id, float(it.qty))
             item_rows.append(models.SaleItem(
@@ -85,6 +88,7 @@ def create_sale(db: Session, data: schemas.SaleCreate) -> models.Sale:
             inv.apply_movement(
                 db, item=prod, item_type="product", delta=-float(it.qty), move_type="sale",
                 unit_cost=int(it.unit_price), cost=line, ref_type="sale", ref_id=sale.id,
+                occurred_at=sale.occurred_at,
             )
             inv.consume_fefo(db, "product", prod.id, float(it.qty))
             item_rows.append(models.SaleItem(
@@ -108,11 +112,29 @@ def create_sale(db: Session, data: schemas.SaleCreate) -> models.Sale:
         sale.customer_id = customer.id
         # nasiyada kassaga pul kirmaydi (keyin to'lanadi)
     else:
-        db.add(models.CashFlow(
+        cf = models.CashFlow(
             direction="in", amount=total, category="Sotuv",
             note="Sotuv tushumi", sale_id=sale.id,
-        ))
+        )
+        if data.occurred_at:
+            cf.occurred_at = data.occurred_at
+        db.add(cf)
 
     db.commit()
     db.refresh(sale)
     return sale
+
+
+def delete_sale(db: Session, sale: models.Sale) -> None:
+    """Sotuvni o'chiradi va barcha ta'sirlarini qaytaradi:
+    mahsulot/qadoqlash stoklari tiklanadi, jurnal va kassa yozuvlari o'chadi."""
+    movements = db.query(models.InventoryMovement).filter_by(
+        ref_type="sale", ref_id=sale.id).all()
+    for mv in movements:
+        inv.delete_movement(db, mv, force=True)
+    db.query(models.CashFlow).filter_by(sale_id=sale.id).delete()
+    # Nasiya sotuviga qilingan to'lovlar saqlanib qolmasin (qarz hisobi buzilmasligi uchun
+    # aynan shu sotuvga bog'langan to'lovlar ham o'chiriladi)
+    db.query(models.NasiyaPayment).filter_by(sale_id=sale.id).delete()
+    db.delete(sale)  # sale_items cascade orqali o'chadi
+    db.commit()

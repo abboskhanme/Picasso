@@ -1,9 +1,10 @@
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Plus, Minus, Trash2, ShoppingCart, Check } from "lucide-react";
+import { Plus, Minus, Trash2, ShoppingCart, Check, Search, ChevronDown } from "lucide-react";
 import { api, fmt } from "@/lib/api";
 import { Sale, Product, ProductSet, PaymentMethod } from "@/types";
-import { Card, PageHeader, Button, Badge, Empty, Spinner, Modal, Field, Input, Segmented, ErrorBox, MoneyInput, PhoneInput, isPhoneComplete, cx } from "@/components/ui";
+import { Card, PageHeader, Button, Badge, Empty, Spinner, Modal, Field, Input, Segmented, ErrorBox, MoneyInput, PhoneInput, isPhoneComplete, cx, DateTimeField, dtToISO, DateTime, ItemPic } from "@/components/ui";
+import { toast, ConfirmDialog } from "@/components/ui/toast";
 
 const payTone: Record<string, string> = { naqd: "g", karta: "b", nasiya: "o" };
 const payLabel: Record<string, string> = { naqd: "Naqd", karta: "Karta", nasiya: "Nasiya" };
@@ -11,7 +12,25 @@ const payLabel: Record<string, string> = { naqd: "Naqd", karta: "Karta", nasiya:
 export default function SalesPage() {
   const qc = useQueryClient();
   const [open, setOpen] = useState(false);
+  const [deleting, setDeleting] = useState<Sale | null>(null);
   const { data: sales, isLoading } = useQuery({ queryKey: ["sales"], queryFn: () => api.get<Sale[]>("/sales") });
+
+  const refreshAll = () => {
+    qc.invalidateQueries({ queryKey: ["sales"] });
+    qc.invalidateQueries({ queryKey: ["dashboard"] });
+    qc.invalidateQueries({ queryKey: ["products"] });
+    qc.invalidateQueries({ queryKey: ["raw"] });
+    qc.invalidateQueries({ queryKey: ["nasiya"] });
+    qc.invalidateQueries({ queryKey: ["flows"] });
+    qc.invalidateQueries({ queryKey: ["balance"] });
+    qc.invalidateQueries({ queryKey: ["movements"] });
+  };
+
+  const del = useMutation({
+    mutationFn: (id: string) => api.del(`/sales/${id}`),
+    onSuccess: () => { refreshAll(); toast("Sotuv o'chirildi — stok va kassa qaytarildi"); },
+    onError: (e) => toast((e as Error).message, "error"),
+  });
 
   return (
     <>
@@ -28,12 +47,16 @@ export default function SalesPage() {
                 <div className="w-9 h-9 rounded-lg bg-sunken flex items-center justify-center text-lg flex-shrink-0">{s.items[0]?.emoji_snapshot ?? "🍫"}</div>
                 <div className="flex-1 min-w-0">
                   <div className="font-medium text-[13px] text-ink truncate">{s.items.map((i) => `${i.name_snapshot}${i.qty > 1 ? ` ×${i.qty}` : ""}`).join(", ") || "To'plam"}</div>
-                  <div className="text-2xs text-muted nums">{new Date(s.occurred_at).toLocaleString("uz-UZ", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}</div>
+                  <div className="mt-1"><DateTime value={s.occurred_at} /></div>
                 </div>
                 <div className="text-right flex flex-col items-end gap-1">
                   <div className={cx("font-semibold text-[13px] nums", s.payment_method === "nasiya" ? "text-warn-fg" : "text-success-fg")}>+{fmt(s.total)}</div>
                   <Badge tone={payTone[s.payment_method]}>{payLabel[s.payment_method]}</Badge>
                 </div>
+                <button onClick={() => setDeleting(s)} title="O'chirish"
+                  className="w-8 h-8 rounded-lg text-faint hover:text-danger hover:bg-danger-bg flex items-center justify-center flex-shrink-0 transition-colors">
+                  <Trash2 size={15} />
+                </button>
               </div>
             ))}
           </div>
@@ -41,18 +64,89 @@ export default function SalesPage() {
       )}
 
       {open && <AddSaleModal onClose={() => setOpen(false)} onSaved={() => {
-        qc.invalidateQueries({ queryKey: ["sales"] });
-        qc.invalidateQueries({ queryKey: ["dashboard"] });
-        qc.invalidateQueries({ queryKey: ["products"] });
-        qc.invalidateQueries({ queryKey: ["nasiya"] });
-        qc.invalidateQueries({ queryKey: ["flows"] });
+        refreshAll();
         setOpen(false);
       }} />}
+
+      {deleting && <ConfirmDialog title="Sotuvni o'chirish" danger confirmLabel="O'chirish"
+        message={<>
+          <b>{fmt(deleting.total)}</b> miqdoridagi sotuv o'chirilsinmi?<br /><br />
+          Bunda unga bog'liq <b>barcha transaksiyalar orqaga qaytadi</b>: mahsulot va qadoqlash
+          stoklari tiklanadi, kassa yozuvi o'chiriladi{deleting.payment_method === "nasiya" ? ", nasiya qarzi bekor bo'ladi" : ""}.
+          Bu amalni ortga qaytarib bo'lmaydi.
+        </>}
+        onConfirm={() => del.mutate(deleting.id)} onClose={() => setDeleting(null)} />}
     </>
   );
 }
 
-type CartLine = { product_id: string; name: string; emoji: string; unit: string; qty: number; unit_price: number; stock: number };
+type CartLine = { product_id: string; name: string; emoji: string; image_url: string | null; unit: string; qty: number; unit_price: number; stock: number };
+
+/* ---------- Professional qidiruvli dropdown — mahsulot tanlash ---------- */
+function ProductPicker({ products, onPick }: { products: Product[]; onPick: (p: Product) => void }) {
+  const [open, setOpen] = useState(false);
+  const [q, setQ] = useState("");
+  const ref = useRef<HTMLDivElement>(null);
+
+  // Tashqariga bosilganda yopish
+  useEffect(() => {
+    const h = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false); };
+    document.addEventListener("mousedown", h);
+    return () => document.removeEventListener("mousedown", h);
+  }, []);
+
+  const list = products.filter((p) => !q.trim() || p.name.toLowerCase().includes(q.trim().toLowerCase()));
+
+  return (
+    <div ref={ref} className="relative">
+      <button type="button" onClick={() => setOpen((o) => !o)}
+        className={cx(
+          "w-full h-10 px-3 rounded-btn border bg-card flex items-center justify-between gap-2 text-left transition-all",
+          open ? "border-brand-500 shadow-focus" : "border-border hover:bg-sunken/50"
+        )}>
+        <span className="flex items-center gap-2 text-[13px] text-muted">
+          <Search size={15} className="text-faint" /> Mahsulot qidirish va tanlash…
+        </span>
+        <ChevronDown size={16} className={cx("text-muted transition-transform duration-150", open && "rotate-180")} />
+      </button>
+
+      {open && (
+        <div className="absolute z-30 mt-1.5 w-full bg-card border border-border rounded-card shadow-pop overflow-hidden anim-pop">
+          <div className="p-2 border-b border-line">
+            <div className="relative">
+              <Search size={14} className="text-faint absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+              <input autoFocus value={q} onChange={(e) => setQ(e.target.value)} placeholder="Nomi bo'yicha qidirish…"
+                className="w-full h-8 pl-8 pr-2.5 rounded-btn bg-sunken text-[12.5px] text-ink placeholder:text-faint outline-none" />
+            </div>
+          </div>
+          <div className="max-h-60 overflow-y-auto scroll-thin py-1">
+            {!list.length ? (
+              <div className="py-7 text-center text-[12.5px] text-muted">Hech narsa topilmadi</div>
+            ) : (
+              list.map((p) => {
+                const out = p.stock <= 0;
+                return (
+                  <button key={p.id} type="button" disabled={out}
+                    onClick={() => { onPick(p); setOpen(false); setQ(""); }}
+                    className="w-full flex items-center gap-2.5 px-3 py-2 text-left hover:bg-brand-50/60 disabled:opacity-45 disabled:pointer-events-none transition-colors">
+                    <ItemPic image={p.image_url} emoji={p.emoji} className="w-8 h-8 text-base" />
+                    <span className="flex-1 min-w-0">
+                      <span className="block text-[13px] font-medium text-ink truncate">{p.name}</span>
+                      <span className="block text-2xs text-muted nums">{fmt(p.price)}</span>
+                    </span>
+                    <Badge tone={out ? "r" : p.stock <= p.min_stock ? "o" : "g"}>
+                      {out ? "Tugagan" : `${p.stock} ${p.unit}`}
+                    </Badge>
+                  </button>
+                );
+              })
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
 
 function AddSaleModal({ onClose, onSaved }: { onClose: () => void; onSaved: () => void }) {
   const [mode, setMode] = useState<"dona" | "set">("dona");
@@ -63,6 +157,7 @@ function AddSaleModal({ onClose, onSaved }: { onClose: () => void; onSaved: () =
   const [setId, setSetId] = useState("");
   const [pay, setPay] = useState<PaymentMethod>("naqd");
   const [cName, setCName] = useState(""); const [cPhone, setCPhone] = useState("");
+  const [when, setWhen] = useState("");
 
   const selectedSet = sets?.find((s) => s.id === setId);
   const total = mode === "set" ? (selectedSet?.price ?? 0) : cart.reduce((a, l) => a + l.qty * l.unit_price, 0);
@@ -71,7 +166,7 @@ function AddSaleModal({ onClose, onSaved }: { onClose: () => void; onSaved: () =
     setCart((c) => {
       const ex = c.find((l) => l.product_id === p.id);
       if (ex) return c.map((l) => l.product_id === p.id ? { ...l, qty: l.qty + 1 } : l);
-      return [...c, { product_id: p.id, name: p.name, emoji: p.emoji, unit: p.unit, qty: 1, unit_price: p.price, stock: p.stock }];
+      return [...c, { product_id: p.id, name: p.name, emoji: p.emoji, image_url: p.image_url, unit: p.unit, qty: 1, unit_price: p.price, stock: p.stock }];
     });
   }
   const setQty = (id: string, qty: number) => setCart((c) => c.map((l) => l.product_id === id ? { ...l, qty: Math.max(1, qty) } : l));
@@ -80,15 +175,15 @@ function AddSaleModal({ onClose, onSaved }: { onClose: () => void; onSaved: () =
 
   const mut = useMutation({
     mutationFn: () => api.post("/sales", mode === "set"
-      ? { kind: "set", set_id: setId, payment_method: pay, customer_name: cName || null, customer_phone: cPhone || null }
-      : { kind: "dona", payment_method: pay, items: cart.map((l) => ({ product_id: l.product_id, qty: l.qty, unit_price: l.unit_price })), customer_name: cName || null, customer_phone: cPhone || null }),
+      ? { kind: "set", set_id: setId, payment_method: pay, customer_name: cName || null, customer_phone: cPhone || null, occurred_at: dtToISO(when) }
+      : { kind: "dona", payment_method: pay, items: cart.map((l) => ({ product_id: l.product_id, qty: l.qty, unit_price: l.unit_price })), customer_name: cName || null, customer_phone: cPhone || null, occurred_at: dtToISO(when) }),
     onSuccess: onSaved,
   });
 
   const canSave = (mode === "set" ? !!setId : cart.length > 0) && (pay !== "nasiya" || (cName && isPhoneComplete(cPhone))) && !mut.isPending;
 
   return (
-    <Modal title="Yangi sotuv" onClose={onClose}
+    <Modal title="Yangi sotuv" tall onClose={onClose}
       footer={
         <div className="flex items-center justify-between gap-3">
           <div>
@@ -110,25 +205,14 @@ function AddSaleModal({ onClose, onSaved }: { onClose: () => void; onSaved: () =
       {mode === "dona" ? (
         <>
           <Field label="Mahsulot qo'shish">
-            <div className="grid grid-cols-2 gap-2 max-h-44 overflow-y-auto scroll-thin pr-0.5">
-              {products?.map((p) => (
-                <button key={p.id} onClick={() => addToCart(p)} disabled={p.stock <= 0}
-                  className="flex items-center gap-2 p-2 rounded-btn border border-border bg-card text-left hover:border-brand-200 hover:bg-brand-50/40 disabled:opacity-40 disabled:pointer-events-none transition-colors">
-                  <span className="text-lg leading-none">{p.emoji}</span>
-                  <span className="min-w-0">
-                    <span className="block text-[12.5px] font-medium text-ink truncate">{p.name}</span>
-                    <span className="block text-2xs text-muted nums">{fmt(p.price)} · {p.stock} {p.unit}</span>
-                  </span>
-                </button>
-              ))}
-            </div>
+            <ProductPicker products={products ?? []} onPick={addToCart} />
           </Field>
 
           {cart.length > 0 && (
             <div className="rounded-btn border border-border divide-y divide-line mb-3.5">
               {cart.map((l) => (
                 <div key={l.product_id} className="flex items-center gap-2 p-2.5">
-                  <span className="text-base leading-none">{l.emoji}</span>
+                  <ItemPic image={l.image_url} emoji={l.emoji} className="w-7 h-7 text-base" rounded="rounded-md" />
                   <div className="flex-1 min-w-0">
                     <div className="text-[12.5px] font-medium text-ink truncate">{l.name}</div>
                     <div className="flex items-center gap-1 mt-1">
@@ -155,7 +239,7 @@ function AddSaleModal({ onClose, onSaved }: { onClose: () => void; onSaved: () =
                 <button key={s.id} onClick={() => setSetId(s.id)}
                   className={cx("flex items-center gap-2.5 p-2.5 rounded-btn border text-left transition-colors",
                     setId === s.id ? "border-brand-500 bg-brand-50/50 ring-1 ring-brand-500" : "border-border bg-card hover:bg-sunken")}>
-                  <span className="text-xl leading-none">{s.emoji}</span>
+                  <ItemPic image={s.image_url} emoji={s.emoji} className="w-9 h-9 text-xl" />
                   <span className="flex-1">
                     <span className="block text-[13px] font-medium text-ink">{s.name}</span>
                     <span className="block text-2xs text-muted">{s.items.length} ta mahsulot</span>
@@ -179,6 +263,8 @@ function AddSaleModal({ onClose, onSaved }: { onClose: () => void; onSaved: () =
           <PhoneInput value={cPhone} onChange={setCPhone} />
         </div>
       )}
+
+      <DateTimeField value={when} onChange={setWhen} />
     </Modal>
   );
 }

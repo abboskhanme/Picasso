@@ -64,6 +64,7 @@ create table if not exists products (
   id          uuid primary key default gen_random_uuid(),
   name        text not null,
   emoji       text default '🍫',
+  image_url   text,                                           -- mahsulot rasmi (/uploads/...)
   price       bigint not null default 0 check (price >= 0),  -- sotish narxi, so'm
   cost_price  bigint not null default 0 check (cost_price >= 0), -- tannarx, so'm
   description text,                                          -- tarkibi/tafsifi (masalan: "Oq shokolad + bodom")
@@ -79,6 +80,7 @@ create table if not exists products (
 alter table products add column if not exists cost_price bigint not null default 0;
 alter table products add column if not exists description text;
 alter table products add column if not exists category   text;
+alter table products add column if not exists image_url  text;
 create index if not exists idx_products_active on products(is_active);
 create trigger trg_products_updated before update on products
   for each row execute function set_updated_at();
@@ -91,6 +93,7 @@ create table if not exists product_sets (
   id          uuid primary key default gen_random_uuid(),
   name        text not null,
   emoji       text default '🎁',
+  image_url   text,                                           -- to'plam rasmi (/uploads/...)
   price       bigint not null default 0 check (price >= 0),  -- to'plam sotish narxi
   is_active   boolean not null default true,
   created_at  timestamptz not null default now(),
@@ -420,6 +423,15 @@ begin
     exception when duplicate_object then null; end;
   end loop;
 end $$;
+
+-- ============================================================
+--  MIGRATSIYA (2026-06): kassa yozuvlarini manbaga bog'lash
+--  O'chirishda bog'liq transaksiyalarni birga qaytarish uchun:
+--  ref_type: 'movement' (ombor xaridi) | 'nasiya' (nasiya to'lovi)
+--  (Backend startda buni avtomatik ham bajaradi — main._auto_migrate)
+-- ============================================================
+alter table cash_flows add column if not exists ref_type varchar;
+alter table cash_flows add column if not exists ref_id uuid;
 
 -- ============================================================
 --  TEKSHIRISH so'rovlari (ixtiyoriy)

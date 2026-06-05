@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Plus, Minus, Trash2, Gift } from "lucide-react";
 import { api, fmt } from "@/lib/api";
 import { Product, ProductSet } from "@/types";
-import { Card, PageHeader, Button, IconButton, Empty, Spinner, Modal, Field, Input, ErrorBox, MoneyInput, cx } from "@/components/ui";
+import { Card, PageHeader, Button, IconButton, Empty, Spinner, Modal, Field, Input, ErrorBox, MoneyInput, cx, ItemPic, ImagePicker } from "@/components/ui";
 
 export default function SetsPage() {
   const qc = useQueryClient();
@@ -29,7 +29,7 @@ export default function SetsPage() {
           {sets.map((s) => (
             <Card key={s.id} className="!mb-0">
               <div className="flex items-start gap-3">
-                <div className="w-10 h-10 rounded-lg bg-sunken flex items-center justify-center text-xl flex-shrink-0">{s.emoji}</div>
+                <ItemPic image={s.image_url} emoji={s.emoji} className="w-10 h-10 text-xl" />
                 <div className="flex-1 min-w-0">
                   <div className="font-semibold text-ink">{s.name}</div>
                   <div className="text-[14px] font-bold text-brand-700 nums">{fmt(s.price)}</div>
@@ -41,7 +41,7 @@ export default function SetsPage() {
                   const p = prodName(it.product_id);
                   return (
                     <div key={it.product_id} className="flex items-center gap-2 text-[12.5px] px-3 py-1.5">
-                      <span className="leading-none">{p?.emoji ?? "🍫"}</span>
+                      <ItemPic image={p?.image_url} emoji={p?.emoji} className="w-6 h-6 text-sm" rounded="rounded-md" />
                       <span className="flex-1 font-medium text-body truncate">{p?.name ?? "—"}</span>
                       <span className="text-muted nums">×{it.qty}</span>
                     </div>
@@ -60,7 +60,7 @@ export default function SetsPage() {
 
 function SetForm({ products, onClose, onSaved }: { products: Product[]; onClose: () => void; onSaved: () => void }) {
   const [name, setName] = useState("");
-  const [emoji, setEmoji] = useState("🎁");
+  const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [price, setPrice] = useState(0);
   const [items, setItems] = useState<Record<string, number>>({});
 
@@ -75,7 +75,7 @@ function SetForm({ products, onClose, onSaved }: { products: Product[]; onClose:
 
   const mut = useMutation({
     mutationFn: () => api.post("/sets", {
-      name, emoji, price,
+      name, emoji: "🎁", image_url: imageUrl, price,
       items: Object.entries(items).map(([product_id, qty]) => ({ product_id, qty })),
     }),
     onSuccess: onSaved,
@@ -87,8 +87,8 @@ function SetForm({ products, onClose, onSaved }: { products: Product[]; onClose:
       footer={<Button variant="ok" className="w-full" onClick={() => mut.mutate()} disabled={!name || chosen === 0 || price <= 0 || mut.isPending}>{mut.isPending ? "Saqlanmoqda…" : "To'plamni saqlash"}</Button>}>
       <ErrorBox message={mut.isError ? (mut.error as Error).message : undefined} />
       <div className="flex gap-3">
-        <div className="w-20"><Field label="Emoji"><Input value={emoji} onChange={(e) => setEmoji(e.target.value)} className="text-center text-lg" /></Field></div>
-        <div className="flex-1"><Field label="To'plam nomi"><Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Valentin seti" /></Field></div>
+        <Field label="Rasm"><ImagePicker value={imageUrl} onChange={setImageUrl} /></Field>
+        <div className="flex-1"><Field label="To'plam nomi" hint="Rasm yuklanmasa, kartochkada 🎁 belgisi ko'rinadi"><Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Valentin seti" /></Field></div>
       </div>
 
       <Field label={`Mahsulotlar (${chosen} ta tanlandi)`}>
@@ -98,7 +98,7 @@ function SetForm({ products, onClose, onSaved }: { products: Product[]; onClose:
             return (
               <div key={p.id} className={cx("flex items-center gap-2 p-2 rounded-btn border transition-colors", on ? "border-brand-500 bg-brand-50/50 ring-1 ring-brand-500" : "border-border bg-card hover:bg-sunken")}>
                 <button onClick={() => toggle(p.id)} className="flex items-center gap-2 flex-1 text-left min-w-0">
-                  <span className="text-lg leading-none">{p.emoji}</span>
+                  <ItemPic image={p.image_url} emoji={p.emoji} className="w-7 h-7 text-base" rounded="rounded-md" />
                   <span className="text-[12.5px] font-medium text-ink truncate">{p.name}</span>
                 </button>
                 {on && (

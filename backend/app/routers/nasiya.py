@@ -41,8 +41,15 @@ def pay(customer_id: uuid.UUID, data: schemas.NasiyaPay, db: Session = Depends(g
     debt = _debt(db, customer_id)
     if data.amount > debt:
         raise HTTPException(400, "To'lov qarzdan ko'p")
-    db.add(models.NasiyaPayment(customer_id=customer_id, amount=data.amount, note=data.note))
-    db.add(models.CashFlow(direction="in", amount=data.amount, category="Nasiya",
-                           note=f"{c.name} nasiya to'lovi"))
+    payment = models.NasiyaPayment(customer_id=customer_id, amount=data.amount, note=data.note)
+    if data.occurred_at:
+        payment.occurred_at = data.occurred_at
+    db.add(payment); db.flush()
+    cf = models.CashFlow(direction="in", amount=data.amount, category="Nasiya",
+                         note=f"{c.name} nasiya to'lovi",
+                         ref_type="nasiya", ref_id=payment.id)
+    if data.occurred_at:
+        cf.occurred_at = data.occurred_at
+    db.add(cf)
     db.commit()
     return {"ok": True, "remaining": debt - data.amount}

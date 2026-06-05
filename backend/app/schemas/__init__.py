@@ -32,6 +32,7 @@ class UserOut(BaseModel):
 class ProductBase(BaseModel):
     name: str
     emoji: str = "🍫"
+    image_url: str | None = None                   # mahsulot rasmi (/uploads/...)
     price: int = Field(ge=0)                       # sotish narxi
     cost_price: int = Field(default=0, ge=0)       # tannarx
     description: str | None = None                 # tarkibi/tafsifi
@@ -48,6 +49,7 @@ class ProductCreate(ProductBase):
 class ProductUpdate(BaseModel):
     name: str | None = None
     emoji: str | None = None
+    image_url: str | None = None
     price: int | None = Field(default=None, ge=0)
     cost_price: int | None = Field(default=None, ge=0)
     description: str | None = None
@@ -66,6 +68,7 @@ class ProductOut(ProductBase):
 class StockUpdate(BaseModel):
     mode: str = "add"        # add | set
     qty: float
+    occurred_at: datetime | None = None   # ixtiyoriy: kechikkan/esdan chiqqan amal sanasi
 
 
 # ---------- Sets ----------
@@ -77,6 +80,7 @@ class SetItemIn(BaseModel):
 class SetCreate(BaseModel):
     name: str
     emoji: str = "🎁"
+    image_url: str | None = None                   # to'plam rasmi (/uploads/...)
     price: int = Field(ge=0)
     items: list[SetItemIn]
 
@@ -92,6 +96,7 @@ class SetOut(BaseModel):
     id: uuid.UUID
     name: str
     emoji: str
+    image_url: str | None = None
     price: int
     is_active: bool
     items: list[SetItemOut]
@@ -136,12 +141,14 @@ class RawBuy(BaseModel):
     cost: int = Field(ge=0)
     expiry_date: date | None = None
     note: str | None = None
+    occurred_at: datetime | None = None
 
 
 class RawUse(BaseModel):
     material_id: uuid.UUID
     qty: float = Field(gt=0)
     note: str | None = None
+    occurred_at: datetime | None = None
 
 
 # ---------- Harakatlar jurnali ----------
@@ -169,6 +176,7 @@ class StockCount(BaseModel):
     item_id: uuid.UUID
     actual_qty: float = Field(ge=0)
     note: str | None = None
+    occurred_at: datetime | None = None
 
 
 class WriteOff(BaseModel):
@@ -176,6 +184,7 @@ class WriteOff(BaseModel):
     item_id: uuid.UUID
     qty: float = Field(gt=0)
     note: str | None = None
+    occurred_at: datetime | None = None
 
 
 # ---------- Retsept (BOM) ----------
@@ -206,6 +215,7 @@ class ProduceIn(BaseModel):
     qty: float = Field(gt=0)
     expiry_date: date | None = None
     note: str | None = None
+    occurred_at: datetime | None = None
 
 
 class ProductionOut(BaseModel):
@@ -264,6 +274,7 @@ class SaleCreate(BaseModel):
     customer_name: str | None = None # nasiya uchun
     customer_phone: str | None = None
     note: str | None = None
+    occurred_at: datetime | None = None
 
 
 class SaleItemOut(BaseModel):
@@ -289,6 +300,7 @@ class SaleOut(BaseModel):
 class NasiyaPay(BaseModel):
     amount: int = Field(gt=0)
     note: str | None = None
+    occurred_at: datetime | None = None
 
 
 class CustomerBalanceOut(BaseModel):
@@ -306,6 +318,7 @@ class CashFlowCreate(BaseModel):
     amount: int = Field(gt=0)
     category: str | None = None
     note: str | None = None
+    occurred_at: datetime | None = None
 
 
 class CashFlowOut(BaseModel):

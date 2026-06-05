@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Phone, HandCoins, Check, CheckCircle2 } from "lucide-react";
 import { api, fmt, fmtPhone } from "@/lib/api";
 import { CustomerBalance } from "@/types";
-import { Card, PageHeader, Section, StatCard, Button, Empty, Spinner, Modal, Field, Input, ErrorBox, MoneyInput, cx } from "@/components/ui";
+import { Card, PageHeader, Section, StatCard, Button, Empty, Spinner, Modal, Field, Input, ErrorBox, MoneyInput, cx, DateTimeField, dtToISO } from "@/components/ui";
 
 export default function NasiyaPage() {
   const { data, isLoading } = useQuery({ queryKey: ["nasiya"], queryFn: () => api.get<CustomerBalance[]>("/nasiya") });
@@ -65,9 +65,10 @@ export default function NasiyaPage() {
 function PayModal({ customer, onClose, onSaved }: { customer: CustomerBalance; onClose: () => void; onSaved: () => void }) {
   const [amount, setAmount] = useState(customer.debt);
   const [note, setNote] = useState("");
+  const [when, setWhen] = useState("");
 
   const mut = useMutation({
-    mutationFn: () => api.post(`/nasiya/${customer.customer_id}/pay`, { amount, note: note || null }),
+    mutationFn: () => api.post(`/nasiya/${customer.customer_id}/pay`, { amount, note: note || null, occurred_at: dtToISO(when) }),
     onSuccess: onSaved,
   });
 
@@ -81,12 +82,13 @@ function PayModal({ customer, onClose, onSaved }: { customer: CustomerBalance; o
         <div className="text-[20px] font-bold text-danger-fg nums">{fmt(customer.debt)}</div>
       </div>
 
-      <Field label="To'lov summasi (so'm)"><MoneyInput value={amount} onChange={setAmount} /></Field>
+      <Field label="To'lov summasi (so'm)"><MoneyInput thousands value={amount} onChange={setAmount} /></Field>
       <div className="flex gap-2 -mt-1.5 mb-3.5">
         <button onClick={() => setAmount(Math.round(customer.debt / 2))} className="flex-1 h-8 rounded-btn bg-sunken border border-border text-[12px] font-medium text-body hover:bg-card transition-colors">Yarmi</button>
         <button onClick={() => setAmount(customer.debt)} className="flex-1 h-8 rounded-btn bg-sunken border border-border text-[12px] font-medium text-body hover:bg-card transition-colors">To'liq</button>
       </div>
       <Field label="Izoh (ixtiyoriy)"><Input value={note} onChange={(e) => setNote(e.target.value)} placeholder="masalan: qisman to'lov" /></Field>
+      <DateTimeField value={when} onChange={setWhen} />
 
       {amount > 0 && amount <= customer.debt && (
         <div className="text-[12.5px] text-muted">To'lovdan keyin qoladi: <b className={cx("nums", remaining > 0 ? "text-danger-fg" : "text-success-fg")}>{fmt(Math.max(0, remaining))}</b></div>

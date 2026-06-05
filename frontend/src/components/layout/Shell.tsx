@@ -1,6 +1,6 @@
 import { ReactNode } from "react";
 import { NavLink, useNavigate } from "react-router-dom";
-import { LayoutDashboard, ShoppingCart, Boxes, Package, Gift, HandCoins, Wallet, LogOut } from "lucide-react";
+import { LayoutDashboard, ShoppingCart, Boxes, History, Gift, HandCoins, Wallet, LogOut } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { clearToken } from "@/lib/api";
 import { cx } from "@/components/ui";
@@ -9,7 +9,7 @@ const nav: { to: string; icon: LucideIcon; label: string; end?: boolean }[] = [
   { to: "/", icon: LayoutDashboard, label: "Bosh sahifa", end: true },
   { to: "/sotuv", icon: ShoppingCart, label: "Sotuv" },
   { to: "/zaxira", icon: Boxes, label: "Zaxira" },
-  { to: "/ombor", icon: Package, label: "Ombor" },
+  { to: "/ombor", icon: History, label: "Harakatlar" },
   { to: "/toplamlar", icon: Gift, label: "To'plamlar" },
   { to: "/nasiya", icon: HandCoins, label: "Nasiya" },
   { to: "/moliya", icon: Wallet, label: "Moliya" },

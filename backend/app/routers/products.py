@@ -46,10 +46,11 @@ def update_stock(pid: uuid.UUID, data: schemas.StockUpdate,
         raise HTTPException(404, "Mahsulot topilmadi")
     if data.mode == "set":
         inv.adjust(db, item=p, item_type="product", actual_qty=data.qty,
-                   note="Qoldiq o'rnatildi", created_by=user.id)
+                   note="Qoldiq o'rnatildi", created_by=user.id, occurred_at=data.occurred_at)
     else:
         inv.apply_movement(db, item=p, item_type="product", delta=data.qty, move_type="manual",
-                           note="Qo'lda kirim", created_by=user.id, allow_negative=True)
+                           note="Qo'lda kirim", created_by=user.id, allow_negative=True,
+                           occurred_at=data.occurred_at)
     db.commit(); db.refresh(p)
     return p
 

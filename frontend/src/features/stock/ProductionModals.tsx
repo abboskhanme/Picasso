@@ -3,7 +3,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { Plus, Trash2 } from "lucide-react";
 import { api, fmt } from "@/lib/api";
 import type { Product, RawMaterial, Recipe } from "@/types";
-import { Modal, Field, Input, Select, Button, IconButton, ErrorBox, Spinner } from "@/components/ui";
+import { Modal, Field, Input, Dropdown, Button, IconButton, ErrorBox, Spinner, DateTimeField, dtToISO, DatePicker } from "@/components/ui";
 import { unitLabel, nf } from "./lib";
 
 /* ---------- Retsept (BOM) tahrirlash ---------- */
@@ -44,9 +44,9 @@ export function RecipeModal({ product, onClose, onSaved }:
               return (
                 <div key={i} className="flex items-end gap-2">
                   <div className="flex-1">
-                    <Select value={r.material_id} onChange={(e) => updLine(i, { material_id: e.target.value })}>
-                      {materials.map((m2) => <option key={m2.id} value={m2.id}>{m2.name} ({unitLabel(m2.unit)})</option>)}
-                    </Select>
+                    <Dropdown value={r.material_id} onChange={(v) => updLine(i, { material_id: v })}
+                      placeholder="Xomashyo tanlang…"
+                      options={materials.map((m2) => ({ v: m2.id, l: `${m2.name} (${unitLabel(m2.unit)})` }))} />
                   </div>
                   <div className="w-24">
                     <Input type="number" min={0} step="any" value={r.qty} onChange={(e) => updLine(i, { qty: +e.target.value })}
@@ -74,13 +74,14 @@ export function ProduceModal({ product, onClose, onSaved }:
   const [qty, setQty] = useState(0);
   const [expiry, setExpiry] = useState("");
   const [note, setNote] = useState("");
+  const [when, setWhen] = useState("");
   const { data: mats } = useQuery({ queryKey: ["raw", "all"], queryFn: () => api.get<RawMaterial[]>("/stock/raw") });
   const { data: recipe, isLoading } = useQuery({ queryKey: ["recipe", product.id], queryFn: () => api.get<Recipe>(`/stock/recipe/${product.id}`) });
   const materials = mats ?? [];
   const lines = recipe?.items ?? [];
 
   const mut = useMutation({
-    mutationFn: () => api.post("/stock/produce", { product_id: product.id, qty, expiry_date: expiry || null, note: note || null }),
+    mutationFn: () => api.post("/stock/produce", { product_id: product.id, qty, expiry_date: expiry || null, note: note || null, occurred_at: dtToISO(when) }),
     onSuccess: onSaved,
   });
 
@@ -122,8 +123,9 @@ export function ProduceModal({ product, onClose, onSaved }:
             </div>
             {qty > 0 && !enough && <p className="text-2xs text-danger-fg mt-1.5 font-medium">Ba'zi xomashyo yetarli emas.</p>}
           </div>
-          <Field label="Yaroqlilik muddati (ixtiyoriy)"><Input type="date" value={expiry} onChange={(e) => setExpiry(e.target.value)} /></Field>
+          <Field label="Yaroqlilik muddati (ixtiyoriy)"><DatePicker value={expiry} onChange={setExpiry} /></Field>
           <Field label="Izoh (ixtiyoriy)"><Input value={note} onChange={(e) => setNote(e.target.value)} placeholder="masalan: tungi smena" /></Field>
+          <DateTimeField value={when} onChange={setWhen} />
         </>
       )}
     </Modal>

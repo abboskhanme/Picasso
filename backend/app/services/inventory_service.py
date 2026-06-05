@@ -142,49 +142,58 @@ def buy_raw(
     expiry_date: date | None = None,
     note: str | None = None,
     created_by: uuid.UUID | None = None,
+    occurred_at: datetime | None = None,
 ):
     """Xomashyo/qadoqlash kirimi: stok +, kassa chiqimi, partiya (muddat bo'lsa)."""
     unit_cost = int(round(cost / qty)) if qty else 0
-    apply_movement(
+    mv = apply_movement(
         db, item=item, item_type="raw", delta=qty, move_type="buy",
         unit_cost=unit_cost, cost=cost,
-        ref_type="purchase", note=note, created_by=created_by,
+        ref_type="purchase", note=note, created_by=created_by, occurred_at=occurred_at,
     )
+    db.flush()  # mv.id kerak (kassa yozuvini bog'lash uchun)
     if expiry_date:
         create_batch(db, item=item, item_type="raw", qty=qty, unit_cost=unit_cost,
                      expiry_date=expiry_date, note=note)
     if cost:
         cat = "Qadoqlash" if getattr(item, "category", "") == "qadoqlash" else "Xom ashyo"
-        db.add(models.CashFlow(direction="out", amount=cost, category=cat,
-                               note=f"{item.name} sotib olindi"))
+        cf = models.CashFlow(direction="out", amount=cost, category=cat,
+                             note=f"{item.name} sotib olindi",
+                             ref_type="movement", ref_id=mv.id)
+        if occurred_at:
+            cf.occurred_at = occurred_at
+        db.add(cf)
+    return mv
 
 
 def use_raw(db: Session, *, item, qty: float, note: str | None = None,
             ref_type: str | None = None, ref_id: uuid.UUID | None = None,
-            created_by: uuid.UUID | None = None):
+            created_by: uuid.UUID | None = None, occurred_at: datetime | None = None):
     """Xomashyo sarfi: stok -, jurnal, FEFO partiya yechimi."""
     apply_movement(db, item=item, item_type="raw", delta=-abs(qty), move_type="use",
-                   note=note, ref_type=ref_type, ref_id=ref_id, created_by=created_by)
+                   note=note, ref_type=ref_type, ref_id=ref_id, created_by=created_by,
+                   occurred_at=occurred_at)
     consume_fefo(db, "raw", item.id, abs(qty))
 
 
 def writeoff(db: Session, *, item, item_type: str, qty: float, note: str | None = None,
-             created_by: uuid.UUID | None = None):
+             created_by: uuid.UUID | None = None, occurred_at: datetime | None = None):
     """Brak / muddati o'tgan / yo'qotish: stok -, jurnal."""
     apply_movement(db, item=item, item_type=item_type, delta=-abs(qty),
-                   move_type="writeoff", note=note, created_by=created_by)
+                   move_type="writeoff", note=note, created_by=created_by,
+                   occurred_at=occurred_at)
     consume_fefo(db, item_type, item.id, abs(qty))
 
 
 def adjust(db: Session, *, item, item_type: str, actual_qty: float, note: str | None = None,
-           created_by: uuid.UUID | None = None):
+           created_by: uuid.UUID | None = None, occurred_at: datetime | None = None):
     """Inventarizatsiya: real sanab chiqilgan miqdorga moslaydi (delta = actual - joriy)."""
     delta = float(actual_qty) - float(item.stock)
     if abs(delta) < 1e-9:
         return None
     return apply_movement(db, item=item, item_type=item_type, delta=delta,
                           move_type="adjust", note=note, created_by=created_by,
-                          allow_negative=True)
+                          allow_negative=True, occurred_at=occurred_at)
 
 
 def produce(
@@ -195,6 +204,7 @@ def produce(
     expiry_date: date | None = None,
     note: str | None = None,
     created_by: uuid.UUID | None = None,
+    occurred_at: datetime | None = None,
 ) -> models.Production:
     """Ishlab chiqarish: retsept bo'yicha xomashyo sarflanadi, tayyor mahsulot oshadi,
     tannarx hisoblanadi va product.cost_price yangilanadi."""
@@ -213,6 +223,8 @@ def produce(
             raise HTTPException(400, f"Xomashyo yetarli emas: {mat.name} (kerak {need:g}, bor {mat.stock:g} {mat.unit})")
 
     prod = models.Production(product_id=product.id, product_name=product.name, qty=qty, note=note, created_by=created_by)
+    if occurred_at:
+        prod.occurred_at = occurred_at
     db.add(prod)
     db.flush()  # prod.id
 
@@ -225,17 +237,18 @@ def produce(
         apply_movement(db, item=mat, item_type="raw", delta=-need, move_type="use",
                        unit_cost=int(mat.unit_price or 0), cost=line_cost,
                        ref_type="production", ref_id=prod.id, created_by=created_by,
-                       note=f"{product.name} i.ch.")
+                       note=f"{product.name} i.ch.", occurred_at=occurred_at)
         consume_fefo(db, "raw", mat.id, need)
 
     # 3) Tayyor mahsulotni kirim qilish
     unit_cost = int(round(cost_total / float(qty))) if qty else 0
     apply_movement(db, item=product, item_type="product", delta=qty, move_type="produce",
                    unit_cost=unit_cost, cost=cost_total, ref_type="production", ref_id=prod.id,
-                   created_by=created_by, note=note)
+                   created_by=created_by, note=note, occurred_at=occurred_at)
     if expiry_date:
         create_batch(db, item=product, item_type="product", qty=qty, unit_cost=unit_cost,
-                     production_date=date.today(), expiry_date=expiry_date, note=note)
+                     production_date=(occurred_at.date() if occurred_at else date.today()),
+                     expiry_date=expiry_date, note=note)
 
     # 4) Tannarxni yangilash
     prod.cost_total = cost_total
@@ -243,3 +256,63 @@ def produce(
     if unit_cost:
         product.cost_price = unit_cost
     return prod
+
+
+# ============================================================
+#  O'CHIRISH / QAYTARISH (reversal)
+#  Har bir history yozuvi o'chirilganda unga bog'liq barcha
+#  transaksiyalar (stok, kassa, nasiya) orqaga qaytariladi.
+# ============================================================
+def _revert_stock(db: Session, mv: models.InventoryMovement) -> None:
+    """Harakat stok ta'sirini bekor qiladi: stock -= delta (manfiyga ruxsat)."""
+    item = db.get(_MODEL[mv.item_type], mv.item_id)
+    if item is not None:
+        item.stock = float(item.stock) - float(mv.delta)
+
+
+def _revert_batch(db: Session, mv: models.InventoryMovement) -> None:
+    """Kirim (buy/produce) bilan yaratilgan partiyani imkon qadar qaytaradi."""
+    if mv.move_type not in ("buy", "produce") or float(mv.delta) <= 0:
+        return
+    b = (
+        db.query(models.Batch)
+        .filter(
+            models.Batch.item_type == mv.item_type,
+            models.Batch.item_id == mv.item_id,
+            models.Batch.qty_initial == float(mv.delta),
+            models.Batch.unit_cost == int(mv.unit_cost or 0),
+        )
+        .order_by(models.Batch.created_at.desc())
+        .first()
+    )
+    if b:
+        b.qty_remaining = max(0.0, float(b.qty_remaining) - float(mv.delta))
+        if b.qty_remaining <= 1e-9:
+            b.is_active = False
+
+
+def delete_movement(db: Session, mv: models.InventoryMovement, *, force: bool = False) -> None:
+    """Bitta jurnal yozuvini o'chiradi: stok qaytadi, bog'liq kassa yozuvi o'chadi.
+
+    Sotuv/ishlab chiqarishga bog'liq harakatlar alohida o'chirilmaydi —
+    ota yozuv (sotuv yoki ishlab chiqarish) o'chirilsa, birga qaytadi.
+    """
+    if not force and mv.ref_type == "sale":
+        raise HTTPException(400, "Bu harakat sotuvga bog'liq — uni Sotuvlar bo'limida sotuvni o'chirish orqali qaytaring")
+    if not force and mv.ref_type == "production":
+        raise HTTPException(400, "Bu harakat ishlab chiqarishga bog'liq — uni Ishlab chiqarish tarixida o'chirish orqali qaytaring")
+    _revert_stock(db, mv)
+    _revert_batch(db, mv)
+    # Shu harakat yaratgan kassa yozuvi (masalan, xomashyo xaridi chiqimi)
+    db.query(models.CashFlow).filter_by(ref_type="movement", ref_id=mv.id).delete()
+    db.delete(mv)
+
+
+def delete_production(db: Session, prod: models.Production) -> None:
+    """Ishlab chiqarishni bekor qiladi: xomashyo stoklari qaytadi,
+    tayyor mahsulot kirimi olib tashlanadi, jurnal yozuvlari o'chadi."""
+    movements = db.query(models.InventoryMovement).filter_by(
+        ref_type="production", ref_id=prod.id).all()
+    for mv in movements:
+        delete_movement(db, mv, force=True)
+    db.delete(prod)

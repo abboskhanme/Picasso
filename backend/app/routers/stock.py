@@ -70,7 +70,8 @@ def buy_raw(data: schemas.RawBuy, user: models.User = Depends(get_current_user),
             rm = models.RawMaterial(name=data.name, category=data.category, unit=data.unit, stock=0)
             db.add(rm); db.flush()
     inv.buy_raw(db, item=rm, qty=data.qty, cost=data.cost,
-                expiry_date=data.expiry_date, note=data.note, created_by=user.id)
+                expiry_date=data.expiry_date, note=data.note, created_by=user.id,
+                occurred_at=data.occurred_at)
     db.commit(); db.refresh(rm)
     return rm
 
@@ -80,7 +81,8 @@ def use_raw(data: schemas.RawUse, user: models.User = Depends(get_current_user),
     rm = db.get(models.RawMaterial, data.material_id)
     if not rm:
         raise HTTPException(404, "Topilmadi")
-    inv.use_raw(db, item=rm, qty=data.qty, note=data.note, created_by=user.id)
+    inv.use_raw(db, item=rm, qty=data.qty, note=data.note, created_by=user.id,
+                occurred_at=data.occurred_at)
     db.commit(); db.refresh(rm)
     return rm
 
@@ -92,7 +94,8 @@ def use_raw(data: schemas.RawUse, user: models.User = Depends(get_current_user),
 def stock_count(data: schemas.StockCount, user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
     item = inv.get_item(db, data.item_type, data.item_id)
     inv.adjust(db, item=item, item_type=data.item_type, actual_qty=data.actual_qty,
-               note=data.note or "Inventarizatsiya", created_by=user.id)
+               note=data.note or "Inventarizatsiya", created_by=user.id,
+               occurred_at=data.occurred_at)
     db.commit()
     return {"ok": True, "stock": float(item.stock)}
 
@@ -101,7 +104,8 @@ def stock_count(data: schemas.StockCount, user: models.User = Depends(get_curren
 def stock_writeoff(data: schemas.WriteOff, user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
     item = inv.get_item(db, data.item_type, data.item_id)
     inv.writeoff(db, item=item, item_type=data.item_type, qty=data.qty,
-                 note=data.note or "Brak / yo'qotish", created_by=user.id)
+                 note=data.note or "Brak / yo'qotish", created_by=user.id,
+                 occurred_at=data.occurred_at)
     db.commit()
     return {"ok": True, "stock": float(item.stock)}
 
@@ -117,10 +121,11 @@ def product_adjust(pid: uuid.UUID, data: schemas.StockUpdate,
         raise HTTPException(404, "Mahsulot topilmadi")
     if data.mode == "set":
         inv.adjust(db, item=p, item_type="product", actual_qty=data.qty,
-                   note="Qoldiq o'rnatildi", created_by=user.id)
+                   note="Qoldiq o'rnatildi", created_by=user.id, occurred_at=data.occurred_at)
     else:
         inv.apply_movement(db, item=p, item_type="product", delta=data.qty, move_type="manual",
-                           note="Qo'lda kirim", created_by=user.id, allow_negative=True)
+                           note="Qo'lda kirim", created_by=user.id, allow_negative=True,
+                           occurred_at=data.occurred_at)
     db.commit(); db.refresh(p)
     return p
 
@@ -150,6 +155,18 @@ def list_movements(
     if date_to:
         q = q.filter(models.InventoryMovement.occurred_at < datetime.combine(date_to + timedelta(days=1), datetime.min.time(), tzinfo=timezone.utc))
     return q.order_by(models.InventoryMovement.occurred_at.desc()).limit(limit).all()
+
+
+@router.delete("/movements/{mid}")
+def remove_movement(mid: uuid.UUID, db: Session = Depends(get_db)):
+    """Jurnal yozuvini o'chiradi — stok va bog'liq kassa yozuvi orqaga qaytadi.
+    Sotuv/ishlab chiqarishga bog'liq yozuvlar ota yozuvi orqali o'chiriladi."""
+    mv = db.get(models.InventoryMovement, mid)
+    if not mv:
+        raise HTTPException(404, "Yozuv topilmadi")
+    inv.delete_movement(db, mv)
+    db.commit()
+    return {"ok": True}
 
 
 # ============================================================
@@ -200,9 +217,20 @@ def produce(data: schemas.ProduceIn, user: models.User = Depends(get_current_use
     if not product:
         raise HTTPException(404, "Mahsulot topilmadi")
     prod = inv.produce(db, product=product, qty=data.qty, expiry_date=data.expiry_date,
-                       note=data.note, created_by=user.id)
+                       note=data.note, created_by=user.id, occurred_at=data.occurred_at)
     db.commit(); db.refresh(prod)
     return prod
+
+
+@router.delete("/productions/{pid}")
+def remove_production(pid: uuid.UUID, db: Session = Depends(get_db)):
+    """Ishlab chiqarishni o'chiradi — xomashyo qaytadi, tayyor mahsulot kirimi bekor bo'ladi."""
+    prod = db.get(models.Production, pid)
+    if not prod:
+        raise HTTPException(404, "Yozuv topilmadi")
+    inv.delete_production(db, prod)
+    db.commit()
+    return {"ok": True}
 
 
 @router.get("/productions", response_model=list[schemas.ProductionOut])

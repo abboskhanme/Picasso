@@ -1,4 +1,5 @@
-from fastapi import APIRouter, Depends
+import uuid
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 from .. import models, schemas
@@ -15,9 +16,33 @@ def cash_flows(db: Session = Depends(get_db)):
 
 @router.post("/cash-flows", response_model=schemas.CashFlowOut)
 def add_cash_flow(data: schemas.CashFlowCreate, db: Session = Depends(get_db)):
-    cf = models.CashFlow(**data.model_dump())
+    payload = data.model_dump(exclude_none=True)
+    cf = models.CashFlow(**payload)
     db.add(cf); db.commit(); db.refresh(cf)
     return cf
+
+
+@router.delete("/cash-flows/{cid}")
+def remove_cash_flow(cid: uuid.UUID, db: Session = Depends(get_db)):
+    """Kassa yozuvini o'chiradi. Bog'liq transaksiyalar ham orqaga qaytadi:
+    - sotuv tushumi → sotuvni o'chirish kerak (bu yerda bloklanadi)
+    - ombor xaridi chiqimi → ombor kirimini o'chirish kerak (bloklanadi)
+    - nasiya to'lovi → to'lov ham o'chadi (qarz tiklanadi)
+    """
+    cf = db.get(models.CashFlow, cid)
+    if not cf:
+        raise HTTPException(404, "Yozuv topilmadi")
+    if cf.sale_id:
+        raise HTTPException(400, "Bu yozuv sotuvga bog'liq — Sotuvlar bo'limida sotuvni o'chiring, hammasi birga qaytadi")
+    if cf.ref_type == "movement":
+        raise HTTPException(400, "Bu yozuv ombor kirimiga bog'liq — Harakatlar tarixida o'sha kirimni o'chiring, hammasi birga qaytadi")
+    if cf.ref_type == "nasiya" and cf.ref_id:
+        p = db.get(models.NasiyaPayment, cf.ref_id)
+        if p:
+            db.delete(p)  # to'lov bekor → mijoz qarzi tiklanadi
+    db.delete(cf)
+    db.commit()
+    return {"ok": True}
 
 
 @router.get("/balance")

@@ -1,10 +1,11 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { History, Filter } from "lucide-react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { History, Filter, Trash2 } from "lucide-react";
 import { api } from "@/lib/api";
 import type { Movement, MoveType } from "@/types";
-import { Card, Section, Select, Input, Badge, Spinner, Empty, Button } from "@/components/ui";
-import { MOVE_META, fmtDateTime, unitLabel, nf } from "./lib";
+import { Card, Dropdown, Badge, Spinner, Empty, Button, DateTime, DatePicker } from "@/components/ui";
+import { toast, ConfirmDialog } from "@/components/ui/toast";
+import { MOVE_META, unitLabel, nf } from "./lib";
 
 const TYPE_OPTIONS: { v: string; l: string }[] = [
   { v: "", l: "Barcha turlar" },
@@ -17,10 +18,27 @@ const TYPE_OPTIONS: { v: string; l: string }[] = [
 ];
 
 export default function MovementsTab() {
+  const qc = useQueryClient();
   const [itemType, setItemType] = useState("");
   const [moveType, setMoveType] = useState("");
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
+  const [deleting, setDeleting] = useState<Movement | null>(null);
+
+  const del = useMutation({
+    mutationFn: (id: string) => api.del(`/stock/movements/${id}`),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["movements"] });
+      qc.invalidateQueries({ queryKey: ["raw"] });
+      qc.invalidateQueries({ queryKey: ["products"] });
+      qc.invalidateQueries({ queryKey: ["flows"] });
+      qc.invalidateQueries({ queryKey: ["balance"] });
+      qc.invalidateQueries({ queryKey: ["dashboard"] });
+      qc.invalidateQueries({ queryKey: ["reorder"] });
+      toast("Yozuv o'chirildi — stok va kassa qaytarildi");
+    },
+    onError: (e) => toast((e as Error).message, "error", 5000),
+  });
 
   const params = new URLSearchParams();
   if (itemType) params.set("item_type", itemType);
@@ -39,22 +57,20 @@ export default function MovementsTab() {
 
   return (
     <>
-      <Section className="mb-3">Harakatlar tarixi</Section>
       <Card className="mb-4" padded>
         <div className="flex items-center gap-2 mb-3 text-muted">
           <Filter size={15} /><span className="text-[12.5px] font-semibold">Filtrlar</span>
         </div>
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5">
-          <Select value={itemType} onChange={(e) => setItemType(e.target.value)}>
-            <option value="">Barcha elementlar</option>
-            <option value="product">Tayyor mahsulot</option>
-            <option value="raw">Xomashyo / qadoqlash</option>
-          </Select>
-          <Select value={moveType} onChange={(e) => setMoveType(e.target.value)}>
-            {TYPE_OPTIONS.map((o) => <option key={o.v} value={o.v}>{o.l}</option>)}
-          </Select>
-          <Input type="date" value={from} onChange={(e) => setFrom(e.target.value)} />
-          <Input type="date" value={to} onChange={(e) => setTo(e.target.value)} />
+          <Dropdown value={itemType} onChange={setItemType}
+            options={[
+              { v: "", l: "Barcha elementlar" },
+              { v: "product", l: "Tayyor mahsulot" },
+              { v: "raw", l: "Xomashyo / qadoqlash" },
+            ]} />
+          <Dropdown value={moveType} onChange={setMoveType} options={TYPE_OPTIONS} />
+          <DatePicker value={from} onChange={setFrom} />
+          <DatePicker value={to} onChange={setTo} />
         </div>
         {(itemType || moveType || from || to) && (
           <Button variant="ghost" size="sm" className="mt-2.5" onClick={reset}>Filtrlarni tozalash</Button>
@@ -80,8 +96,9 @@ export default function MovementsTab() {
                       <span className="font-semibold text-ink text-[13.5px] truncate">{m.item_name}</span>
                       <Badge tone={meta.tone}>{meta.label}</Badge>
                     </div>
-                    <div className="text-2xs text-faint mt-0.5">
-                      {fmtDateTime(m.occurred_at)}{m.note ? ` · ${m.note}` : ""}
+                    <div className="mt-1 flex items-center gap-1.5 flex-wrap">
+                      <DateTime value={m.occurred_at} />
+                      {m.note && <span className="text-2xs text-muted truncate">{m.note}</span>}
                     </div>
                   </div>
                   <div className="text-right flex-shrink-0">
@@ -90,12 +107,25 @@ export default function MovementsTab() {
                     </div>
                     <div className="text-2xs text-faint nums">→ {nf(m.balance_after)}</div>
                   </div>
+                  <button onClick={() => setDeleting(m)} title="O'chirish"
+                    className="w-8 h-8 rounded-lg text-faint hover:text-danger hover:bg-danger-bg flex items-center justify-center flex-shrink-0 transition-colors">
+                    <Trash2 size={15} />
+                  </button>
                 </div>
               );
             })}
           </div>
         </Card>
       )}
+
+      {deleting && <ConfirmDialog title="Harakatni o'chirish" danger confirmLabel="O'chirish"
+        message={<>
+          <b>{deleting.item_name}</b> — {MOVE_META[deleting.move_type as MoveType]?.label ?? deleting.move_type}{" "}
+          ({deleting.delta > 0 ? "+" : ""}{nf(deleting.delta)} {unitLabel(deleting.unit)}) yozuvi o'chirilsinmi?<br /><br />
+          Unga bog'liq <b>barcha transaksiyalar orqaga qaytadi</b>: stok tiklanadi, bog'liq
+          kassa yozuvi o'chiriladi. Sotuv/ishlab chiqarish harakatlari esa faqat o'z bo'limida o'chiriladi.
+        </>}
+        onConfirm={() => del.mutate(deleting.id)} onClose={() => setDeleting(null)} />}
     </>
   );
 }

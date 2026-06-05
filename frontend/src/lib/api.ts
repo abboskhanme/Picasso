@@ -18,6 +18,26 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   return res.status === 204 ? (undefined as T) : res.json();
 }
 
+/** Nisbiy rasm yo'lini (/uploads/...) to'liq manzilga aylantiradi. */
+export const imgSrc = (p?: string | null): string | undefined =>
+  p ? (/^https?:\/\//.test(p) ? p : `${BASE}${p}`) : undefined;
+
+/** Rasm faylini serverga yuklaydi, {url} qaytaradi (mahsulot/to'plam rasmi uchun). */
+export async function uploadImage(file: File): Promise<{ url: string }> {
+  const fd = new FormData();
+  fd.append("file", file);
+  const headers: Record<string, string> = {};
+  const token = getToken();
+  if (token) headers.Authorization = `Bearer ${token}`;
+  const res = await fetch(`${BASE}/uploads/image`, { method: "POST", body: fd, headers });
+  if (!res.ok) {
+    let msg = "Rasm yuklashda xatolik";
+    try { const e = await res.json(); msg = e.detail || msg; } catch {}
+    throw new Error(msg);
+  }
+  return res.json();
+}
+
 export const api = {
   get: <T>(p: string) => request<T>(p),
   post: <T>(p: string, body?: unknown) => request<T>(p, { method: "POST", body: JSON.stringify(body) }),
@@ -56,6 +76,8 @@ export const PHONE_COUNTRIES: PhoneCountry[] = [
   { code: "KG", flag: "🇰🇬", name: "Qirg'iziston", dial: "996", len: 9,  groups: [3, 3, 3],    example: "700 123 456" },
   { code: "TJ", flag: "🇹🇯", name: "Tojikiston",   dial: "992", len: 9,  groups: [2, 3, 4],    example: "90 123 4567" },
   { code: "TM", flag: "🇹🇲", name: "Turkmaniston", dial: "993", len: 8,  groups: [2, 2, 2, 2], example: "65 12 34 56" },
+  // Abxaziya Rossiya raqamlash rejasidan foydalanadi: +7 940 XXX-XX-XX (mobil)
+  { code: "AB", flag: "🏴", name: "Abxaziya",     dial: "7940", len: 7, groups: [3, 2, 2],    example: "123 45 67" },
 ];
 
 // uzun kodlar avval tekshirilsin (masalan "998" — "7" dan oldin)
