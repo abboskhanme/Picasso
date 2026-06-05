@@ -10,7 +10,7 @@ import type { Product, RawMaterial } from "@/types";
 import {
   Card, Section, StatCard, Button, IconButton, Badge, Empty, Spinner,
   Modal, Field, Input, Textarea, Dropdown, Segmented, ErrorBox, MoneyInput, cx,
-  DateTimeField, dtToISO, ItemPic, ImagePicker,
+  DateTimeField, dtToISO, ItemPic, ImagePicker, DatePicker,
 } from "@/components/ui";
 import { toast, ConfirmDialog } from "@/components/ui/toast";
 import { stockState, SortKey, SORT_OPTIONS, sortAndFilter, unitLabel, nf, StockBar } from "./lib";
