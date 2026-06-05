@@ -36,8 +36,9 @@ services:
     build:
       context: ./frontend
       args:
-        # Brauzer API'ga shu manzil orqali murojaat qiladi (Caddy /api ni backendga yuboradi)
-        VITE_API_URL: https://${DOMAIN}/api
+        # Brauzer same-origin /api ga murojaat qiladi (Caddy /api ni backendga yuboradi)
+        # Bu domen ham, yalang'och IP ham bir xil ishlashini ta'minlaydi
+        VITE_API_URL: /api
     container_name: picasso_frontend
     restart: unless-stopped
     depends_on:
