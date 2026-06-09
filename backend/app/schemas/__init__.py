@@ -77,17 +77,38 @@ class SetItemIn(BaseModel):
     qty: float = Field(gt=0)
 
 
+class SetPackagingIn(BaseModel):
+    material_id: uuid.UUID
+    qty: float = Field(gt=0)
+
+
 class SetCreate(BaseModel):
     name: str
     emoji: str = "🎁"
     image_url: str | None = None                   # to'plam rasmi (/uploads/...)
     price: int = Field(ge=0)
     items: list[SetItemIn]
+    packaging: list[SetPackagingIn] = []           # to'plam qadoqlash retsepti
+
+
+class SetUpdate(BaseModel):
+    name: str
+    emoji: str = "🎁"
+    image_url: str | None = None
+    price: int = Field(ge=0)
+    items: list[SetItemIn]
+    packaging: list[SetPackagingIn] = []
 
 
 class SetItemOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     product_id: uuid.UUID
+    qty: float
+
+
+class SetPackagingOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    material_id: uuid.UUID
     qty: float
 
 
@@ -100,6 +121,7 @@ class SetOut(BaseModel):
     price: int
     is_active: bool
     items: list[SetItemOut]
+    packaging: list[SetPackagingOut] = []
 
 
 # ---------- Raw materials (xomashyo + qadoqlash) ----------

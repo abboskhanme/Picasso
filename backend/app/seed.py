@@ -25,7 +25,8 @@ PRODUCTS: list[tuple[str, int]] = [
     ("Molochniy shokolad keshyu",   5_350),
 ]
 
-# (nomi, dona narxi so'm) — to'plam sotuvida har biridan 1 dona avtomatik sarflanadi
+# (nomi, dona narxi so'm) — har to'plam o'z qadoqlash retseptida qaysisidan
+# nechtadan ketishini belgilaydi (To'plamlar bo'limida sozlanadi)
 PACKAGING: list[tuple[str, int]] = [
     ("Karobka",             3_300),
     ("Pergament",             100),

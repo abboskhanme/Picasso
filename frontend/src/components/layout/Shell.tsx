@@ -8,11 +8,11 @@ import { cx } from "@/components/ui";
 const nav: { to: string; icon: LucideIcon; label: string; end?: boolean }[] = [
   { to: "/", icon: LayoutDashboard, label: "Bosh sahifa", end: true },
   { to: "/sotuv", icon: ShoppingCart, label: "Sotuv" },
-  { to: "/zaxira", icon: Boxes, label: "Zaxira" },
-  { to: "/ombor", icon: History, label: "Harakatlar" },
-  { to: "/toplamlar", icon: Gift, label: "To'plamlar" },
   { to: "/nasiya", icon: HandCoins, label: "Nasiya" },
+  { to: "/zaxira", icon: Boxes, label: "Zaxira" },
+  { to: "/toplamlar", icon: Gift, label: "To'plamlar" },
   { to: "/moliya", icon: Wallet, label: "Moliya" },
+  { to: "/ombor", icon: History, label: "Harakatlar" },
 ];
 
 function Logo({ size = "md" }: { size?: "sm" | "md" }) {

@@ -1,7 +1,7 @@
 import { ReactNode, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import type { LucideIcon } from "lucide-react";
-import { X, Loader2, AlertCircle, Inbox, ChevronDown, ChevronLeft, ChevronRight, CalendarClock, CalendarDays, Clock, ImagePlus, Check, Search } from "lucide-react";
+import { X, Loader2, AlertCircle, Inbox, ChevronDown, ChevronLeft, ChevronRight, CalendarClock, CalendarDays, Clock, ImagePlus, Check, Search, MoreHorizontal } from "lucide-react";
 import { PHONE_COUNTRIES, groupNational, phoneCountry, imgSrc, uploadImage } from "@/lib/api";
 
 /* ---------- utils ---------- */
@@ -292,6 +292,81 @@ export function Dropdown({ value, onChange, options, placeholder = "Tanlang…",
               })
             )}
           </div>
+        </div>,
+        document.body
+      )}
+    </>
+  );
+}
+
+/* ---------- overflow menyu (⋯) ---------- */
+
+/** Uchta nuqtali (⋯) ochiluvchi amallar menyusi. Menyu portal orqali chiziladi —
+ *  kartochka yoki modal overflow'i uni kesib qo'ymaydi, pastda joy bo'lmasa
+ *  yuqoriga ochiladi. Har bir element: ikon + matn, ixtiyoriy `danger` rangi. */
+export type MenuItem = { label: string; icon?: LucideIcon; onClick: () => void; danger?: boolean };
+export function Menu({ items, label = "Boshqa amallar", className = "" }:
+  { items: MenuItem[]; label?: string; className?: string }) {
+  const [open, setOpen] = useState(false);
+  const btnRef = useRef<HTMLButtonElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const [pos, setPos] = useState<{ top?: number; bottom?: number; right: number }>({ right: 0 });
+
+  const place = () => {
+    const r = btnRef.current?.getBoundingClientRect();
+    if (!r) return;
+    const up = r.bottom + 240 > window.innerHeight && r.top > 240;
+    setPos(up
+      ? { bottom: window.innerHeight - r.top + 6, right: window.innerWidth - r.right }
+      : { top: r.bottom + 6, right: window.innerWidth - r.right });
+  };
+
+  useEffect(() => {
+    if (!open) return;
+    const close = (e: MouseEvent) => {
+      const t = e.target as Node;
+      if (btnRef.current?.contains(t) || menuRef.current?.contains(t)) return;
+      setOpen(false);
+    };
+    const key = (e: KeyboardEvent) => { if (e.key === "Escape") setOpen(false); };
+    const move = () => place();
+    document.addEventListener("mousedown", close);
+    document.addEventListener("keydown", key);
+    window.addEventListener("scroll", move, true);
+    window.addEventListener("resize", move);
+    return () => {
+      document.removeEventListener("mousedown", close);
+      document.removeEventListener("keydown", key);
+      window.removeEventListener("scroll", move, true);
+      window.removeEventListener("resize", move);
+    };
+  }, [open]);
+
+  return (
+    <>
+      <button ref={btnRef} type="button" aria-label={label} title={label}
+        onClick={() => { if (!open) place(); setOpen((o) => !o); }}
+        className={cx(btnBase, btnVariant.s, "h-8 w-8 p-0", className)}>
+        <MoreHorizontal size={16} />
+      </button>
+      {open && createPortal(
+        <div ref={menuRef}
+          style={{ position: "fixed", top: pos.top, bottom: pos.bottom, right: pos.right, zIndex: 80 }}
+          className="min-w-[176px] bg-card border border-border rounded-card shadow-pop overflow-hidden py-1 anim-pop">
+          {items.map((it, i) => {
+            const I = it.icon;
+            return (
+              <button key={i} type="button"
+                onClick={() => { setOpen(false); it.onClick(); }}
+                className={cx(
+                  "w-full flex items-center gap-2.5 px-3 py-2 text-left text-[12.5px] font-medium transition-colors",
+                  it.danger ? "text-danger-fg hover:bg-danger-bg" : "text-body hover:bg-sunken"
+                )}>
+                {I && <I size={15} className="flex-shrink-0" />}
+                {it.label}
+              </button>
+            );
+          })}
         </div>,
         document.body
       )}

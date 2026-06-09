@@ -10,7 +10,7 @@ import type { Product, RawMaterial } from "@/types";
 import {
   Card, Section, StatCard, Button, IconButton, Badge, Empty, Spinner,
   Modal, Field, Input, Textarea, Dropdown, Segmented, ErrorBox, MoneyInput, cx,
-  DateTimeField, dtToISO, ItemPic, ImagePicker, DatePicker,
+  DateTimeField, dtToISO, ItemPic, ImagePicker, DatePicker, Menu,
 } from "@/components/ui";
 import { toast, ConfirmDialog } from "@/components/ui/toast";
 import { stockState, SortKey, SORT_OPTIONS, sortAndFilter, unitLabel, nf, StockBar } from "./lib";
@@ -329,17 +329,17 @@ function ProductsTab() {
                   <div className="bg-sunken rounded-lg py-2 text-center"><div className="text-2xs text-muted">Sotish</div><div className="text-[12px] font-semibold text-ink nums">{p.price.toLocaleString("uz-UZ")}</div></div>
                   <div className="bg-success-bg rounded-lg py-2 text-center"><div className="text-2xs text-success-fg/80">Foyda</div><div className={cx("text-[12px] font-semibold nums", margin >= 0 ? "text-success-fg" : "text-danger-fg")}>{margin.toLocaleString("uz-UZ")}</div></div>
                 </div>
-                <div className="flex gap-2 mt-3">
+                <div className="flex gap-2 mt-3.5">
                   <Button variant="ok" size="sm" className="flex-1" onClick={() => setProduceItem(p)}><Factory size={14} /> Ishlab chiqarish</Button>
-                  <IconButton label="Retsept" variant="s" className="h-8 w-8" onClick={() => setRecipeItem(p)}><ChefHat size={14} /></IconButton>
-                  <IconButton label="Tarix" variant="s" className="h-8 w-8" onClick={() => setHistoryItem(p)}><History size={14} /></IconButton>
-                </div>
-                <div className="flex gap-2 mt-2">
-                  <Button variant="s" size="sm" className="flex-1" onClick={() => setStockItem(p)}>Qoldiq</Button>
-                  <IconButton label="Inventarizatsiya" variant="s" className="h-8 w-8" onClick={() => setCountItem(p)}><SlidersHorizontal size={14} /></IconButton>
-                  <IconButton label="Brak" variant="s" className="h-8 w-8 text-danger" onClick={() => setWriteoffItem(p)}><Trash2 size={14} /></IconButton>
-                  <IconButton label="Tahrir" variant="s" className="h-8 w-8" onClick={() => setEditItem(p)}><Pencil size={14} /></IconButton>
-                  <IconButton label="Arxivlash" variant="s" className="h-8 w-8 text-danger" onClick={() => setArchiveItem(p)}><Ban size={14} /></IconButton>
+                  <Button variant="s" size="sm" onClick={() => setRecipeItem(p)}><ChefHat size={14} /> Retsept</Button>
+                  <Menu items={[
+                    { label: "Qoldiq qo'shish", icon: Boxes, onClick: () => setStockItem(p) },
+                    { label: "Harakatlar tarixi", icon: History, onClick: () => setHistoryItem(p) },
+                    { label: "Inventarizatsiya", icon: SlidersHorizontal, onClick: () => setCountItem(p) },
+                    { label: "Tahrirlash", icon: Pencil, onClick: () => setEditItem(p) },
+                    { label: "Brak / yo'qotish", icon: Trash2, danger: true, onClick: () => setWriteoffItem(p) },
+                    { label: "Arxivlash", icon: Ban, danger: true, onClick: () => setArchiveItem(p) },
+                  ]} />
                 </div>
               </Card>
             );

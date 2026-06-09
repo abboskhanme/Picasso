@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
   TrendingUp, TrendingDown, Receipt, ArrowDownRight, HandCoins, Wallet,
@@ -9,7 +10,7 @@ import {
 } from "recharts";
 import { api, fmt, fmtShort } from "@/lib/api";
 import { DashboardData } from "@/types";
-import { Card, Section, StatCard, PageHeader, Empty, Spinner, ItemPic } from "@/components/ui";
+import { Card, Section, StatCard, Segmented, PageHeader, Empty, Spinner, ItemPic } from "@/components/ui";
 
 const C = {
   brand: "#774a2a",
@@ -61,6 +62,7 @@ function TrendChip({ now, prev }: { now: number; prev: number }) {
 }
 
 export default function DashboardPage() {
+  const [statView, setStatView] = useState<"today" | "finance">("today");
   const { data, isLoading, error } = useQuery({
     queryKey: ["dashboard"],
     queryFn: () => api.get<DashboardData>("/reports/dashboard"),
@@ -80,24 +82,41 @@ export default function DashboardPage() {
   const hasSales = daily.some((d) => d.revenue > 0);
   const hasFlow = cashflow.some((d) => d.in > 0 || d.out > 0);
 
+  const statViews = {
+    today: [
+      { tone: "g" as const, icon: TrendingUp, value: fmt(data.today_revenue), label: "Bugungi sotuv" },
+      { tone: "o" as const, icon: Receipt, value: `${data.today_count} ta`, label: "Operatsiyalar" },
+      { tone: "p" as const, icon: ArrowDownRight, value: fmt(data.month_out), label: "Oylik chiqim" },
+      { tone: "b" as const, icon: HandCoins, value: fmt(data.nasiya_total), label: "Jami nasiya" },
+    ],
+    finance: [
+      { tone: "g" as const, icon: Wallet, value: fmt(data.balance), label: "Kassa qoldig'i" },
+      { tone: "o" as const, icon: ArrowUpRight, value: fmt(data.month_in), label: "Oylik kirim" },
+      { tone: "p" as const, icon: ArrowDownRight, value: fmt(data.month_out), label: "Oylik chiqim" },
+      { tone: "b" as const, icon: TrendingUp, value: fmt(data.month_revenue), label: "Oylik sotuv" },
+    ],
+  };
+  const stats = statViews[statView];
+
   return (
     <>
       <PageHeader title="Bosh sahifa" subtitle="Bugungi savdo va moliyaviy ko'rsatkichlar" />
 
-      <Section className="mb-2.5">Bugungi holat</Section>
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
-        <StatCard tone="g" icon={TrendingUp} value={fmt(data.today_revenue)} label="Bugungi sotuv" />
-        <StatCard tone="o" icon={Receipt} value={`${data.today_count} ta`} label="Operatsiyalar" />
-        <StatCard tone="p" icon={ArrowDownRight} value={fmt(data.month_out)} label="Oylik chiqim" />
-        <StatCard tone="b" icon={HandCoins} value={fmt(data.nasiya_total)} label="Jami nasiya" />
+      <div className="flex items-center justify-between gap-3 mb-2.5">
+        <Section>{statView === "today" ? "Bugungi holat" : "Moliyaviy holat"}</Section>
+        <Segmented
+          value={statView}
+          onChange={setStatView}
+          options={[
+            { value: "today", label: "Bugun" },
+            { value: "finance", label: "Moliya" },
+          ]}
+        />
       </div>
-
-      <Section className="mb-2.5">Moliyaviy holat</Section>
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
-        <StatCard tone="g" icon={Wallet} value={fmt(data.balance)} label="Kassa qoldig'i" />
-        <StatCard tone="o" icon={ArrowUpRight} value={fmt(data.month_in)} label="Oylik kirim" />
-        <StatCard tone="p" icon={ArrowDownRight} value={fmt(data.month_out)} label="Oylik chiqim" />
-        <StatCard tone="b" icon={TrendingUp} value={fmt(data.month_revenue)} label="Oylik sotuv" />
+        {stats.map((s, i) => (
+          <StatCard key={i} tone={s.tone} icon={s.icon} value={s.value} label={s.label} />
+        ))}
       </div>
 
       {data.low_stock.length > 0 && (

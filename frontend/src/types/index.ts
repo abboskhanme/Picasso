@@ -13,6 +13,7 @@ export interface RawMaterial {
 export interface ProductSet {
   id: string; name: string; emoji: string; image_url: string | null; price: number;
   is_active: boolean; items: { product_id: string; qty: number }[];
+  packaging: { material_id: string; qty: number }[];
 }
 export interface SaleItem {
   name_snapshot: string; emoji_snapshot: string | null;

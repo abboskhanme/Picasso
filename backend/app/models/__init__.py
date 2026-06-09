@@ -51,6 +51,11 @@ class ProductSet(Base):
     items: Mapped[list["ProductSetItem"]] = relationship(
         back_populates="product_set", cascade="all, delete-orphan"
     )
+    # To'plamga ketadigan qadoqlash materiallari (karobka, lenta, sticker...).
+    # To'plam sotilganda shu ro'yxat bo'yicha qadoqlash ombordan ayriladi.
+    packaging: Mapped[list["ProductSetPackaging"]] = relationship(
+        back_populates="product_set", cascade="all, delete-orphan"
+    )
 
 
 class ProductSetItem(Base):
@@ -60,6 +65,16 @@ class ProductSetItem(Base):
     qty: Mapped[float] = mapped_column(Numeric(12, 2))
     product_set: Mapped["ProductSet"] = relationship(back_populates="items")
     product: Mapped["Product"] = relationship()
+
+
+class ProductSetPackaging(Base):
+    """To'plam uchun qadoqlash retsepti — qaysi qadoqlashdan nechtadan ketadi."""
+    __tablename__ = "product_set_packaging"
+    set_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("product_sets.id", ondelete="CASCADE"), primary_key=True)
+    material_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("raw_materials.id", ondelete="CASCADE"), primary_key=True)
+    qty: Mapped[float] = mapped_column(Numeric(12, 3))
+    product_set: Mapped["ProductSet"] = relationship(back_populates="packaging")
+    material: Mapped["RawMaterial"] = relationship()
 
 
 class RawMaterial(Base):

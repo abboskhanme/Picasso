@@ -23,11 +23,11 @@ export default function App() {
         <Route element={<Protected />}>
           <Route path="/" element={<DashboardPage />} />
           <Route path="/sotuv" element={<SalesPage />} />
-          <Route path="/zaxira" element={<ZaxiraPage />} />
-          <Route path="/ombor" element={<StockPage />} />
-          <Route path="/toplamlar" element={<SetsPage />} />
           <Route path="/nasiya" element={<NasiyaPage />} />
+          <Route path="/zaxira" element={<ZaxiraPage />} />
+          <Route path="/toplamlar" element={<SetsPage />} />
           <Route path="/moliya" element={<FinancePage />} />
+          <Route path="/ombor" element={<StockPage />} />
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

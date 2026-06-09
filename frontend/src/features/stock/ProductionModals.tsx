@@ -9,7 +9,7 @@ import { unitLabel, nf } from "./lib";
 /* ---------- Retsept (BOM) tahrirlash ---------- */
 export function RecipeModal({ product, onClose, onSaved }:
   { product: Product; onClose: () => void; onSaved: () => void }) {
-  const { data: mats } = useQuery({ queryKey: ["raw", "all"], queryFn: () => api.get<RawMaterial[]>("/stock/raw") });
+  const { data: mats } = useQuery({ queryKey: ["raw", "xomashyo"], queryFn: () => api.get<RawMaterial[]>("/stock/raw?category=xomashyo") });
   const { data: recipe, isLoading } = useQuery({ queryKey: ["recipe", product.id], queryFn: () => api.get<Recipe>(`/stock/recipe/${product.id}`) });
   const [lines, setLines] = useState<{ material_id: string; qty: number }[] | null>(null);
   const rows = lines ?? recipe?.items ?? [];
@@ -35,7 +35,7 @@ export function RecipeModal({ product, onClose, onSaved }:
     <Modal wide title={"Retsept · " + product.name} onClose={onClose}
       footer={<Button className="w-full" onClick={() => mut.mutate()} disabled={mut.isPending}>{mut.isPending ? "Saqlanmoqda…" : "Retseptni saqlash"}</Button>}>
       <ErrorBox message={mut.isError ? (mut.error as Error).message : undefined} />
-      <p className="text-[12.5px] text-muted mb-3">1 dona "{product.name}" tayyorlash uchun ketadigan xomashyo/qadoqlash.</p>
+      <p className="text-[12.5px] text-muted mb-3">1 dona "{product.name}" tayyorlash uchun ketadigan xomashyo. Qadoqlash bu yerda kerak emas — u to'plamlarda hisoblanadi.</p>
       {isLoading ? <Spinner /> : (
         <>
           <div className="flex flex-col gap-2">
