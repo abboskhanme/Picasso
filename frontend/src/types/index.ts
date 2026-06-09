@@ -39,7 +39,7 @@ export interface Movement {
   unit_cost: number; cost: number;
   ref_type: string | null; note: string | null; occurred_at: string;
 }
-export interface RecipeLine { material_id: string; qty: number; }
+export interface RecipeLine { material_id: string; qty: number; unit?: string | null; }
 export interface Recipe {
   product_id: string; items: RecipeLine[]; cost_estimate: number;
 }

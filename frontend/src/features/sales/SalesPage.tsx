@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Plus, Minus, Trash2, ShoppingCart, Check, Search, ChevronDown } from "lucide-react";
 import { api, fmt } from "@/lib/api";
 import { Sale, Product, ProductSet, PaymentMethod } from "@/types";
-import { Card, PageHeader, Button, Badge, Empty, Spinner, Modal, Field, Input, Segmented, ErrorBox, MoneyInput, PhoneInput, isPhoneComplete, cx, DateTimeField, dtToISO, DateTime, ItemPic } from "@/components/ui";
+import { Card, PageHeader, Button, Badge, Empty, Spinner, Modal, Field, Input, NumberInput, Segmented, ErrorBox, MoneyInput, PhoneInput, isPhoneComplete, cx, DateTimeField, dtToISO, DateTime, ItemPic } from "@/components/ui";
 import { toast, ConfirmDialog } from "@/components/ui/toast";
 
 const payTone: Record<string, string> = { naqd: "g", karta: "b", nasiya: "o" };
@@ -216,13 +216,13 @@ function AddSaleModal({ onClose, onSaved }: { onClose: () => void; onSaved: () =
                   <div className="flex-1 min-w-0">
                     <div className="text-[12.5px] font-medium text-ink truncate">{l.name}</div>
                     <div className="flex items-center gap-1 mt-1">
-                      <div className="w-28"><MoneyInput compact value={l.unit_price} onChange={(v) => setPrice(l.product_id, v)} /></div>
+                      <div className="w-20 sm:w-28"><MoneyInput compact value={l.unit_price} onChange={(v) => setPrice(l.product_id, v)} /></div>
                       <span className="text-2xs text-muted">so'm</span>
                     </div>
                   </div>
                   <div className="flex items-center gap-1">
                     <button onClick={() => setQty(l.product_id, l.qty - 1)} className="w-7 h-7 rounded-md border border-border text-muted hover:bg-sunken flex items-center justify-center"><Minus size={14} /></button>
-                    <input type="number" value={l.qty} onChange={(e) => setQty(l.product_id, +e.target.value)} className="w-10 h-7 text-center rounded-md border border-border text-[12px] font-semibold nums outline-none focus:border-brand-500" />
+                    <NumberInput bare value={l.qty} onChange={(v) => setQty(l.product_id, v)} className="w-10 h-7 text-center rounded-md border border-border text-[12px] font-semibold focus:border-brand-500" />
                     <button onClick={() => setQty(l.product_id, l.qty + 1)} className="w-7 h-7 rounded-md border border-border text-muted hover:bg-sunken flex items-center justify-center"><Plus size={14} /></button>
                   </div>
                   <button onClick={() => remove(l.product_id)} className="w-7 h-7 rounded-md text-danger hover:bg-danger-bg flex items-center justify-center"><Trash2 size={14} /></button>

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   Plus, Pencil, Trash2, Wheat, Candy, Package, ArrowDownToLine, ArrowUpFromLine,
@@ -8,8 +8,8 @@ import type { LucideIcon } from "lucide-react";
 import { api, fmt, fmtShort } from "@/lib/api";
 import type { Product, RawMaterial } from "@/types";
 import {
-  Card, Section, StatCard, Button, IconButton, Badge, Empty, Spinner,
-  Modal, Field, Input, Textarea, Dropdown, Segmented, ErrorBox, MoneyInput, cx,
+  Card, Section, StatCard, Button, Badge, Empty, Spinner,
+  Modal, Field, Input, NumberInput, Textarea, Dropdown, Segmented, ErrorBox, MoneyInput, cx,
   DateTimeField, dtToISO, ItemPic, ImagePicker, DatePicker, Menu,
 } from "@/components/ui";
 import { toast, ConfirmDialog } from "@/components/ui/toast";
@@ -19,9 +19,10 @@ import { RecipeModal, ProduceModal } from "./ProductionModals";
 
 type SubTab = "xomashyo" | "tayyor" | "qadoqlash";
 
-const TAB_META: Record<SubTab, { label: string; icon: LucideIcon }> = {
+const TAB_META: Record<SubTab, { label: ReactNode; icon: LucideIcon }> = {
   xomashyo: { label: "Xomashyo", icon: Wheat },
-  tayyor: { label: "Tayyor mahsulot", icon: Candy },
+  // Mobil'da "Tayyor", sm+ da to'liq "Tayyor mahsulot" — tor ekranda tab sig'masligini oldini oladi
+  tayyor: { label: <>Tayyor<span className="hidden sm:inline"> mahsulot</span></>, icon: Candy },
   qadoqlash: { label: "Qadoqlash", icon: Package },
 };
 
@@ -148,14 +149,14 @@ function RawTab({ category }: { category: "xomashyo" | "qadoqlash" }) {
                 </div>
                 <div className="flex gap-2 mt-3.5">
                   <Button variant="ok" size="sm" className="flex-1" onClick={() => setMoveItem({ item: m, mode: "buy" })}><ArrowDownToLine size={14} /> Kirim</Button>
-                  <Button variant="s" size="sm" className="flex-1" onClick={() => setMoveItem({ item: m, mode: "use" })}><ArrowUpFromLine size={14} /> Sarflash</Button>
-                  <IconButton label="Inventarizatsiya" variant="s" className="h-8 w-8" onClick={() => setCountItem(m)}><SlidersHorizontal size={14} /></IconButton>
-                  <IconButton label="Tarix" variant="s" className="h-8 w-8" onClick={() => setHistoryItem(m)}><History size={14} /></IconButton>
-                </div>
-                <div className="flex gap-2 mt-2">
-                  <IconButton label="Brak" variant="s" className="h-8 w-8 text-danger" onClick={() => setWriteoffItem(m)}><Trash2 size={14} /></IconButton>
-                  <IconButton label="Tahrirlash" variant="s" className="h-8 w-8" onClick={() => setEditItem(m)}><Pencil size={14} /></IconButton>
-                  <IconButton label="Arxivlash" variant="s" className="h-8 w-8 text-danger" onClick={() => setArchiveItem(m)}><Ban size={14} /></IconButton>
+                  <Button variant="s" size="sm" onClick={() => setMoveItem({ item: m, mode: "use" })}><ArrowUpFromLine size={14} /> Sarflash</Button>
+                  <Menu items={[
+                    { label: "Inventarizatsiya", icon: SlidersHorizontal, onClick: () => setCountItem(m) },
+                    { label: "Harakatlar tarixi", icon: History, onClick: () => setHistoryItem(m) },
+                    { label: "Tahrirlash", icon: Pencil, onClick: () => setEditItem(m) },
+                    { label: "Brak / yo'qotish", icon: Trash2, danger: true, onClick: () => setWriteoffItem(m) },
+                    { label: "Arxivlash", icon: Ban, danger: true, onClick: () => setArchiveItem(m) },
+                  ]} />
                 </div>
               </Card>
             );
@@ -206,9 +207,9 @@ function RawForm({ category, item, onClose, onSaved }:
       </div>
       <div className="flex gap-3">
         {!item && <div className="flex-1"><Field label={`Boshlang'ich miqdor (${unitLabel(unit)})`}>
-          <Input type="number" min={0} value={stock} onChange={(e) => setStock(+e.target.value)} /></Field></div>}
+          <NumberInput value={stock} onChange={setStock} /></Field></div>}
         <div className="flex-1"><Field label={`Min. zaxira (${unitLabel(unit)})`}>
-          <Input type="number" min={0} value={minStock} onChange={(e) => setMinStock(+e.target.value)} /></Field></div>
+          <NumberInput value={minStock} onChange={setMinStock} /></Field></div>
       </div>
     </Modal>
   );
@@ -235,7 +236,7 @@ function RawMoveModal({ item, mode, onClose, onSaved }:
       footer={<Button variant={mode === "buy" ? "ok" : "p"} className="w-full" onClick={() => mut.mutate()} disabled={qty <= 0 || mut.isPending}>{mut.isPending ? "Saqlanmoqda…" : mode === "buy" ? "Kirim qilish" : "Sarflash"}</Button>}>
       <ErrorBox message={mut.isError ? (mut.error as Error).message : undefined} />
       <div className="text-[12.5px] text-muted mb-3.5">Joriy qoldiq: <b className="text-ink nums">{nf(item.stock)} {u}</b></div>
-      <Field label={`Miqdor (${u})`}><Input type="number" min={0} value={qty} onChange={(e) => setQty(+e.target.value)} /></Field>
+      <Field label={`Miqdor (${u})`}><NumberInput value={qty} onChange={setQty} /></Field>
       {mode === "buy" ? (
         <>
           <Field label="Umumiy narx (so'm)"><MoneyInput thousands value={cost} onChange={setCost} /></Field>
@@ -397,8 +398,8 @@ function ProductForm({ item, onClose, onSaved }: { item?: Product; onClose: () =
       </div>
       <div className="flex gap-3">
         <div className="flex-1"><Field label="O'lchov"><Dropdown value={unit} onChange={setUnit} options={PROD_UNITS} /></Field></div>
-        {!item && <div className="flex-1"><Field label="Boshlang'ich qoldiq"><Input type="number" min={0} value={stock} onChange={(e) => setStock(+e.target.value)} /></Field></div>}
-        <div className="flex-1"><Field label="Min. zaxira"><Input type="number" min={0} value={minStock} onChange={(e) => setMinStock(+e.target.value)} /></Field></div>
+        {!item && <div className="flex-1"><Field label="Boshlang'ich qoldiq"><NumberInput value={stock} onChange={setStock} /></Field></div>}
+        <div className="flex-1"><Field label="Min. zaxira"><NumberInput value={minStock} onChange={setMinStock} /></Field></div>
       </div>
     </Modal>
   );
@@ -421,7 +422,7 @@ function ProductStockModal({ item, onClose, onSaved }: { item: Product; onClose:
         <Segmented className="w-full" value={mode} onChange={setMode}
           options={[{ value: "add", label: "Qo'shish (+)" }, { value: "set", label: "O'rnatish (=)" }]} />
       </Field>
-      <Field label={`Miqdor (${item.unit})`}><Input type="number" value={qty} onChange={(e) => setQty(+e.target.value)} /></Field>
+      <Field label={`Miqdor (${item.unit})`}><NumberInput value={qty} onChange={setQty} /></Field>
       <DateTimeField value={when} onChange={setWhen} />
     </Modal>
   );

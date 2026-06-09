@@ -4,9 +4,11 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func
 from .. import models, schemas
 from ..database import get_db
-from ..deps import get_current_user
+from ..deps import require_owner
+from ..logging_config import logger
 
-router = APIRouter(prefix="/finance", tags=["finance"], dependencies=[Depends(get_current_user)])
+# Moliya bo'limi — to'liq egasi/administrator huquqini talab qiladi
+router = APIRouter(prefix="/finance", tags=["finance"], dependencies=[Depends(require_owner)])
 
 
 @router.get("/cash-flows", response_model=list[schemas.CashFlowOut])
@@ -42,6 +44,7 @@ def remove_cash_flow(cid: uuid.UUID, db: Session = Depends(get_db)):
             db.delete(p)  # to'lov bekor → mijoz qarzi tiklanadi
     db.delete(cf)
     db.commit()
+    logger.info("Kassa yozuvi o'chirildi id=%s yo'nalish=%s summa=%s", cid, cf.direction, cf.amount)
     return {"ok": True}
 
 

@@ -7,10 +7,12 @@ import uuid
 from pathlib import Path
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from ..deps import get_current_user
+from ..config import settings
 
 router = APIRouter(prefix="/uploads", tags=["uploads"], dependencies=[Depends(get_current_user)])
 
-UPLOAD_ROOT = Path(__file__).resolve().parents[1] / "uploads"   # backend/app/uploads
+# Doimiy volume yo'li (UPLOAD_DIR) yoki dev uchun backend/app/uploads
+UPLOAD_ROOT = Path(settings.UPLOAD_DIR) if settings.UPLOAD_DIR else Path(__file__).resolve().parents[1] / "uploads"
 IMAGES_DIR = UPLOAD_ROOT / "images"
 
 ALLOWED_TYPES = {

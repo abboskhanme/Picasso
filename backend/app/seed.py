@@ -13,6 +13,7 @@ from sqlalchemy.orm import Session
 
 from . import models
 from .core.security import hash_password
+from .logging_config import logger
 
 
 # (nomi, sotish narxi so'm)
@@ -92,7 +93,7 @@ def purge_demo_data(db: Session) -> None:
     db.delete(marker)
 
     db.commit()
-    print("[seed] Eski namunaviy katalog tozalandi")
+    logger.info("[seed] Eski namunaviy katalog tozalandi")
 
 
 def sync_catalog(db: Session) -> None:
@@ -125,4 +126,4 @@ def seed(db: Session) -> None:
         hashed_password=hash_password("admin123"), role="owner",
     ))
     db.commit()
-    print("[seed] Admin foydalanuvchi yaratildi (admin@picasso.uz)")
+    logger.info("[seed] Admin foydalanuvchi yaratildi (admin@picasso.uz)")

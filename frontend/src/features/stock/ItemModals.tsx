@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { History, Trash2 } from "lucide-react";
 import { api } from "@/lib/api";
 import type { Movement } from "@/types";
-import { Modal, Field, Input, Button, Badge, Spinner, Empty, ErrorBox, DateTimeField, dtToISO, DateTime } from "@/components/ui";
+import { Modal, Field, Input, NumberInput, Button, Badge, Spinner, Empty, ErrorBox, DateTimeField, dtToISO, DateTime } from "@/components/ui";
 import { toast, ConfirmDialog } from "@/components/ui/toast";
 import { MOVE_META, unitLabel, nf } from "./lib";
 
@@ -28,7 +28,7 @@ export function CountModal({ item, itemType, onClose, onSaved }:
       <ErrorBox message={mut.isError ? (mut.error as Error).message : undefined} />
       <div className="text-[12.5px] text-muted mb-3.5">Tizimdagi qoldiq: <b className="text-ink nums">{nf(item.stock)} {u}</b></div>
       <Field label={`Aniq sanab chiqilgan miqdor (${u})`}>
-        <Input type="number" value={actual} onChange={(e) => setActual(+e.target.value)} />
+        <NumberInput value={actual} onChange={setActual} />
       </Field>
       {Math.abs(diff) > 1e-9 && (
         <div className={`text-[12.5px] font-semibold mb-3.5 ${diff < 0 ? "text-danger-fg" : "text-success-fg"}`}>
@@ -57,7 +57,7 @@ export function WriteoffModal({ item, itemType, onClose, onSaved }:
       footer={<Button variant="no" className="w-full" onClick={() => mut.mutate()} disabled={qty <= 0 || mut.isPending}>{mut.isPending ? "Saqlanmoqda…" : "Hisobdan chiqarish"}</Button>}>
       <ErrorBox message={mut.isError ? (mut.error as Error).message : undefined} />
       <div className="text-[12.5px] text-muted mb-3.5">Joriy qoldiq: <b className="text-ink nums">{nf(item.stock)} {u}</b></div>
-      <Field label={`Miqdor (${u})`}><Input type="number" min={0} value={qty} onChange={(e) => setQty(+e.target.value)} /></Field>
+      <Field label={`Miqdor (${u})`}><NumberInput value={qty} onChange={setQty} /></Field>
       <Field label="Sabab"><Input value={note} onChange={(e) => setNote(e.target.value)} placeholder="masalan: muddati o'tgan, sinish" /></Field>
       <DateTimeField value={when} onChange={setWhen} />
     </Modal>

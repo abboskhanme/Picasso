@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Plus, ArrowDownLeft, ArrowUpRight, Check, Wallet, Scale, Trash2 } from "lucide-react";
+import { Plus, ArrowDownLeft, ArrowUpRight, Check, Wallet, Trash2 } from "lucide-react";
 import { api, fmt } from "@/lib/api";
 import { CashFlow } from "@/types";
 import { Card, PageHeader, Section, StatCard, Button, Empty, Spinner, Modal, Field, Input, Segmented, ErrorBox, MoneyInput, cx, DateTimeField, dtToISO, DateTime } from "@/components/ui";
@@ -35,11 +35,10 @@ export default function FinancePage() {
       <PageHeader title="Moliya" subtitle="Kassa qoldig'i, kirim va chiqimlar"
         action={<Button onClick={() => setOpen(true)}><Plus size={16} /> Kirim / Chiqim</Button>} />
 
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
+      <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 mb-6">
         <StatCard tone="g" icon={Wallet} value={fmt(bal.data!.balance)} label="Kassa qoldig'i" />
         <StatCard tone="o" icon={ArrowDownLeft} value={fmt(bal.data!.total_in)} label="Jami kirim" />
         <StatCard tone="p" icon={ArrowUpRight} value={fmt(bal.data!.total_out)} label="Jami chiqim" />
-        <StatCard tone="b" icon={Scale} value={fmt(bal.data!.total_in - bal.data!.total_out)} label="Saldo" />
       </div>
 
       <Section className="mb-2.5">Pul oqimi tarixi</Section>

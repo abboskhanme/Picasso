@@ -8,6 +8,35 @@ import type { MoveType } from "@/types";
 /* ---------- o'lchov ---------- */
 export const unitLabel = (u?: string | null) => (u === "gramm" ? "gr" : u || "");
 
+/* ---------- birliklar va mutanosib konvertatsiya ----------
+   Bir o'lchamdagi birliklar o'zaro aylanadi (kg↔gramm, litr↔ml, metr↔sm).
+   Backenddagi units.py bilan bir xil koeffitsientlar. */
+const UNIT_DIM: Record<string, [string, number]> = {
+  gramm: ["mass", 1], gr: ["mass", 1], kg: ["mass", 1000],
+  ml: ["volume", 1], litr: ["volume", 1000],
+  sm: ["length", 1], metr: ["length", 100],
+};
+// shu o'lchamdagi birliklarni qaysi tartibda ko'rsatamiz (yirikdan maydaga)
+const DIM_UNITS: Record<string, string[]> = {
+  mass: ["kg", "gramm"], volume: ["litr", "ml"], length: ["metr", "sm"],
+};
+
+/** qty ni `from` birligidan `to` birligiga aylantiradi (mos kelmasa o'zgartirmaydi). */
+export function convertUnit(qty: number, from?: string | null, to?: string | null): number {
+  if (!from || !to || from === to) return qty;
+  const f = UNIT_DIM[from], t = UNIT_DIM[to];
+  if (f && t && f[0] === t[0]) return (qty * f[1]) / t[1];
+  return qty;
+}
+
+/** Berilgan ombor birligi uchun retseptda tanlash mumkin bo'lgan birliklar. */
+export function compatibleUnits(base?: string | null): { v: string; l: string }[] {
+  if (!base) return [];
+  const info = UNIT_DIM[base];
+  if (!info) return [{ v: base, l: unitLabel(base) }];      // dona/quti/paket — faqat o'zi
+  return DIM_UNITS[info[0]].map((u) => ({ v: u, l: unitLabel(u) }));
+}
+
 /* ---------- zaxira holati ---------- */
 export function stockState(stock: number, min: number) {
   if (stock === 0) return { tone: "r" as const, label: "Tugagan", avatar: "bg-danger-bg text-danger-fg", ring: "border-danger-bg", bar: "bg-danger" };

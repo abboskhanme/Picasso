@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Plus, Minus, Trash2, Gift, Pencil, Package } from "lucide-react";
 import { api, fmt } from "@/lib/api";
 import { Product, ProductSet, RawMaterial } from "@/types";
-import { Card, PageHeader, Button, IconButton, Empty, Spinner, Modal, Field, Input, ErrorBox, MoneyInput, cx, ItemPic, ImagePicker } from "@/components/ui";
+import { Card, PageHeader, Button, IconButton, Empty, Spinner, Modal, Field, Input, NumberInput, ErrorBox, MoneyInput, cx, ItemPic, ImagePicker } from "@/components/ui";
 
 export default function SetsPage() {
   const qc = useQueryClient();
@@ -142,7 +142,7 @@ function SetForm({ set, products, packaging, onClose, onSaved }:
                 {on && (
                   <div className="flex items-center gap-1">
                     <button onClick={() => setItemQty(p.id, items[p.id] - 1)} className="w-7 h-7 rounded-md border border-border text-muted hover:bg-sunken flex items-center justify-center"><Minus size={14} /></button>
-                    <input type="number" value={items[p.id]} onChange={(e) => setItemQty(p.id, +e.target.value)} className="w-10 h-7 text-center rounded-md border border-border text-[12px] font-semibold nums outline-none focus:border-brand-500" />
+                    <NumberInput bare value={items[p.id]} onChange={(v) => setItemQty(p.id, v)} className="w-10 h-7 text-center rounded-md border border-border text-[12px] font-semibold focus:border-brand-500" />
                     <button onClick={() => setItemQty(p.id, items[p.id] + 1)} className="w-7 h-7 rounded-md border border-border text-muted hover:bg-sunken flex items-center justify-center"><Plus size={14} /></button>
                   </div>
                 )}
@@ -168,7 +168,7 @@ function SetForm({ set, products, packaging, onClose, onSaved }:
                   {on && (
                     <div className="flex items-center gap-1">
                       <button onClick={() => setPackQty(m.id, packs[m.id] - 1)} className="w-7 h-7 rounded-md border border-border text-muted hover:bg-sunken flex items-center justify-center"><Minus size={14} /></button>
-                      <input type="number" value={packs[m.id]} onChange={(e) => setPackQty(m.id, +e.target.value)} className="w-10 h-7 text-center rounded-md border border-border text-[12px] font-semibold nums outline-none focus:border-brand-500" />
+                      <NumberInput bare value={packs[m.id]} onChange={(v) => setPackQty(m.id, v)} className="w-10 h-7 text-center rounded-md border border-border text-[12px] font-semibold focus:border-brand-500" />
                       <button onClick={() => setPackQty(m.id, packs[m.id] + 1)} className="w-7 h-7 rounded-md border border-border text-muted hover:bg-sunken flex items-center justify-center"><Plus size={14} /></button>
                     </div>
                   )}

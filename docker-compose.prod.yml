@@ -30,6 +30,13 @@ services:
       DATABASE_URL: postgresql+psycopg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
       JWT_SECRET: ${JWT_SECRET}
       SEED_ON_START: ${SEED_ON_START:-true}
+      APP_ENV: production
+      # Brauzer same-origin /api ga murojaat qiladi, lekin CORS to'g'ridan-to'g'ri
+      # so'rovlar uchun domeniga cheklanadi
+      CORS_ORIGINS: https://${DOMAIN}
+      UPLOAD_DIR: /data/uploads
+    volumes:
+      - uploads:/data/uploads        # yuklangan rasmlar (redeploy'da saqlanadi)
     # Tashqi port YO'Q — Caddy /api/* orqali proxy qiladi
 
   frontend:
@@ -66,3 +73,4 @@ volumes:
   pgdata:
   caddy_data:
   caddy_config:
+  uploads:

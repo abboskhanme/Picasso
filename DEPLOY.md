@@ -48,6 +48,10 @@ Quyidagilarni o'zgartiring:
 - `POSTGRES_PASSWORD` — kuchli parol:  `openssl rand -hex 16`
 - `JWT_SECRET` — uzun tasodifiy satr:  `openssl rand -hex 32`
 
+> ⚠️ `APP_ENV=production` (compose'da o'rnatilgan) bo'lganda `JWT_SECRET` standart
+> qiymatda qoldirilsa backend **ataylab ishga tushmaydi**. CORS ham avtomatik
+> `https://DOMAIN` ga cheklanadi.
+
 ## 5. Ishga tushirish
 Loyiha ildizida (docker-compose.prod.yml shu yerda):
 
@@ -84,6 +88,19 @@ Standart admin parolini almashtiring:
 So'ng demo mahsulotlar/xomashyolar kerak bo'lmasa, ularni interfeysdan arxivlang,
 `.env` da `SEED_ON_START=false` qiling va qayta ishga tushiring (8-bo'lim).
 
+### Foydalanuvchi rollari
+- `admin@picasso.uz` — **owner** roli (to'liq huquq: moliya, o'chirish, narx/katalog).
+- Ochiq ro'yxatdan o'tgan (`/auth/register`) foydalanuvchilar — **seller** roli
+  (faqat sotuv va ko'rish; moliya va o'chirish amallari yopiq).
+- Birovni egasi qilish uchun bazada rolini qo'lda o'zgartiring:
+
+      docker compose -f docker-compose.prod.yml exec backend python -c "
+      from app.database import SessionLocal; from app import models
+      db = SessionLocal()
+      u = db.query(models.User).filter_by(email='kerakli@email').first()
+      u.role = 'owner'; db.commit(); print('rol yangilandi')
+      "
+
 ---
 
 ## 7. Yangilanish (kod o'zgargach)
@@ -92,7 +109,22 @@ Yangi kodni tortib oling va qayta build qiling:
     git pull
     docker compose -f docker-compose.prod.yml --env-file .env up -d --build
 
-Ma'lumotlar bazasi (`pgdata` volume) saqlanib qoladi.
+Ma'lumotlar bazasi (`pgdata` volume) va yuklangan rasmlar (`uploads` volume)
+saqlanib qoladi.
+
+### Sxema migratsiyalari (Alembic)
+Sxema o'zgarsa (yangi ustun/jadval), migratsiya yarating va qo'llang:
+
+    docker compose -f docker-compose.prod.yml exec backend alembic revision --autogenerate -m "tavsif"
+    docker compose -f docker-compose.prod.yml exec backend alembic upgrade head
+
+Ishga tushganda mavjud baza avtomatik `head` ga belgilanadi; yangi migratsiyalar
+keyingi deploy'da o'zi qo'llanadi.
+
+### Testlar (dev)
+Lokal muhitda biznes-logikani tekshirish:
+
+    docker compose exec backend pytest
 
 ## 8. Foydali buyruqlar
 
@@ -116,5 +148,7 @@ Ma'lumotlar bazasi (`pgdata` volume) saqlanib qoladi.
   ishlamayotganiga ishonch hosil qiling.
 - Frontend API manzili build paytida `https://DOMAIN/api` ga qotiriladi.
   Domen o'zgarsa, frontend qayta build qilinishi kerak (`--build`).
-- Backend CORS hozir `*` — frontend va API bir domende bo'lgani uchun muammo yo'q.
-  Istasangiz `backend/app/main.py` da domeningizga cheklashingiz mumkin.
+- Backend CORS production'da avtomatik `https://DOMAIN` ga cheklanadi
+  (`CORS_ORIGINS`, docker-compose.prod.yml). Boshqa manba kerak bo'lsa, vergul
+  bilan qo'shing: `CORS_ORIGINS=https://DOMAIN,https://admin.DOMAIN`.
+- Backend root bo'lmagan foydalanuvchi (appuser) sifatida ishlaydi (xavfsizlik).

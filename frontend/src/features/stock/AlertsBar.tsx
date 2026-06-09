@@ -47,9 +47,9 @@ export default function AlertsBar() {
               const d = daysUntil(b.expiry_date);
               const danger = d !== null && d <= 7;
               return (
-                <div key={b.id} className="flex items-center justify-between text-[12.5px]">
-                  <span className="text-body truncate">{b.item_name} <span className="text-faint nums">· {nf(b.qty_remaining)} {unitLabel(b.unit)}</span></span>
-                  <Badge tone={danger ? "r" : "o"}>{d !== null && d < 0 ? "muddati o'tgan" : `${d} kun · ${fmtDate(b.expiry_date)}`}</Badge>
+                <div key={b.id} className="flex items-center justify-between gap-2 text-[12.5px]">
+                  <span className="text-body truncate min-w-0 flex-1">{b.item_name} <span className="text-faint nums">· {nf(b.qty_remaining)} {unitLabel(b.unit)}</span></span>
+                  <Badge tone={danger ? "r" : "o"} className="flex-shrink-0 whitespace-nowrap">{d !== null && d < 0 ? "muddati o'tgan" : `${d} kun · ${fmtDate(b.expiry_date)}`}</Badge>
                 </div>
               );
             })}
@@ -66,12 +66,12 @@ export default function AlertsBar() {
           <div className="flex flex-col gap-2">
             {re.slice(0, 5).map((r) => (
               <div key={r.item_id} className="flex items-center justify-between gap-2 text-[12.5px]">
-                <span className="text-body truncate flex-1">
+                <span className="text-body truncate min-w-0 flex-1">
                   {r.name} <span className="text-faint nums">· {nf(r.stock)}/{nf(r.min_stock)} {unitLabel(r.unit)}</span>
                 </span>
-                <span className="text-muted nums">~{nf(r.suggested_qty)} {unitLabel(r.unit)}</span>
+                <span className="text-muted nums flex-shrink-0 whitespace-nowrap">~{nf(r.suggested_qty)} {unitLabel(r.unit)}</span>
                 {r.item_type === "raw" && (
-                  <Button size="sm" variant="s" onClick={() => buy.mutate(r)} disabled={buy.isPending || !r.suggested_qty}>
+                  <Button size="sm" variant="s" className="flex-shrink-0" onClick={() => buy.mutate(r)} disabled={buy.isPending || !r.suggested_qty}>
                     {r.est_cost ? fmt(r.est_cost) : "Kirim"}
                   </Button>
                 )}

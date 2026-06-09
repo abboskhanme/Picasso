@@ -43,11 +43,15 @@ services:
       DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-picasso}:${POSTGRES_PASSWORD:-picasso_secret}@db:5432/${POSTGRES_DB:-picasso}
       JWT_SECRET: ${JWT_SECRET:-change_me_in_production}
       SEED_ON_START: "true"
+      UPLOAD_DIR: /data/uploads
     ports:
       - "8000:8000"
     # Kod jonli ulanadi — image ichiga muhrlanmaydi
     volumes:
       - ./backend/app:/code/app
+      - ./backend/tests:/code/tests              # testlar (docker compose exec backend pytest)
+      - ./backend/migrations:/code/migrations    # alembic migratsiyalari (jonli)
+      - uploads:/data/uploads                    # yuklangan rasmlar (doimiy)
     # --reload: .py fayl o'zgarsa server o'zi qayta yuklanadi
     command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
 
@@ -76,3 +80,4 @@ services:
 volumes:
   pgdata:
   frontend_node_modules:
+  uploads:

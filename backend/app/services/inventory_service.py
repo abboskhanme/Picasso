@@ -12,6 +12,7 @@ from datetime import date, datetime
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
 from .. import models
+from .. import units
 
 # Stok manbai (item_type -> model)
 _MODEL = {"product": models.Product, "raw": models.RawMaterial}
@@ -218,7 +219,8 @@ def produce(
         mat = db.get(models.RawMaterial, r.material_id)
         if not mat:
             raise HTTPException(404, "Retseptdagi xomashyo topilmadi")
-        need = float(r.qty) * float(qty)
+        # retsept boshqa birlikda bo'lsa, xomashyo ombor birligiga aylantiramiz
+        need = units.convert(float(r.qty), r.unit, mat.unit) * float(qty)
         if float(mat.stock) < need - 1e-9:
             raise HTTPException(400, f"Xomashyo yetarli emas: {mat.name} (kerak {need:g}, bor {mat.stock:g} {mat.unit})")
 
@@ -231,7 +233,7 @@ def produce(
     # 2) Xomashyoni sarflash
     for r in recipes:
         mat = db.get(models.RawMaterial, r.material_id)
-        need = float(r.qty) * float(qty)
+        need = units.convert(float(r.qty), r.unit, mat.unit) * float(qty)
         line_cost = int(round(float(mat.unit_price or 0) * need))
         cost_total += line_cost
         apply_movement(db, item=mat, item_type="raw", delta=-need, move_type="use",

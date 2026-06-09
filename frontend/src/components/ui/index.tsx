@@ -198,6 +198,50 @@ export function Select(props: React.SelectHTMLAttributes<HTMLSelectElement>) {
   );
 }
 
+/* ---------- raqam kiritish ---------- */
+
+/** Son kiritish maydoni. Oddiy `<input type="number">` muammosini hal qiladi:
+ *  qiymat 0 bo'lganda maydonda haqiqiy "0" turmaydi (faqat placeholder), shuning
+ *  uchun yangi son yozilganda "040" kabi old nol qolib ketmaydi. Kasr (masalan,
+ *  1.5 kg) ham qo'llanadi; manfiy va begona belgilar tashlab yuboriladi.
+ *
+ *  `bare` — o'z o'lchamiga ega kichik maydonlar uchun (standart fieldCls qo'llanmaydi). */
+export function NumberInput({ value, onChange, className, placeholder = "0", bare = false, decimal = true }:
+  { value: number; onChange: (n: number) => void; className?: string; placeholder?: string; bare?: boolean; decimal?: boolean }) {
+  const [text, setText] = useState(value ? String(value) : "");
+
+  // Tashqaridan qiymat o'zgarsa (reset/oldindan to'ldirish) matnni moslaymiz —
+  // lekin "0." / "1." kabi chala terilgan holatni buzmaslik uchun faqat son
+  // qiymati farq qilganda yangilaymiz.
+  useEffect(() => {
+    const cur = text.trim() === "" || text === "." ? 0 : Number(text);
+    if (Number.isNaN(cur) || cur !== value) setText(value ? String(value) : "");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [value]);
+
+  const handle = (raw: string) => {
+    let s = raw.replace(decimal ? /[^\d.]/g : /[^\d]/g, "");
+    if (decimal) {
+      const i = s.indexOf(".");                                   // faqat bitta nuqta
+      if (i !== -1) s = s.slice(0, i + 1) + s.slice(i + 1).replace(/\./g, "");
+    }
+    s = s.replace(/^0+(?=\d)/, "");                                // ortiqcha old nollar: 040 → 40, 0.5 saqlanadi
+    setText(s);
+    const n = s === "" || s === "." ? 0 : Number(s);
+    if (!Number.isNaN(n)) onChange(n);
+  };
+
+  return (
+    <input
+      inputMode={decimal ? "decimal" : "numeric"}
+      value={text}
+      placeholder={placeholder}
+      onChange={(e) => handle(e.target.value)}
+      className={cx(bare ? "nums outline-none" : cx(fieldCls, "nums"), className)}
+    />
+  );
+}
+
 /* ---------- professional dropdown (custom select) ---------- */
 
 /** Brauzerning standart <select> o'rniga dizayn tizimiga mos ochiluvchi ro'yxat.

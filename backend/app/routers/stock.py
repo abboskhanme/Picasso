@@ -5,8 +5,10 @@ from sqlalchemy.orm import Session
 from sqlalchemy import or_
 from .. import models, schemas
 from ..database import get_db
-from ..deps import get_current_user
+from ..deps import get_current_user, require_owner
 from ..services import inventory_service as inv
+from .. import units
+from ..logging_config import logger
 
 router = APIRouter(prefix="/stock", tags=["stock"], dependencies=[Depends(get_current_user)])
 
@@ -23,7 +25,7 @@ def list_raw(category: str | None = Query(default=None), db: Session = Depends(g
 
 
 @router.post("/raw", response_model=schemas.RawMaterialOut)
-def create_raw(data: schemas.RawCreate, user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
+def create_raw(data: schemas.RawCreate, user: models.User = Depends(require_owner), db: Session = Depends(get_db)):
     payload = data.model_dump()
     initial = float(payload.pop("stock", 0) or 0)
     rm = models.RawMaterial(stock=0, **payload)
@@ -36,7 +38,7 @@ def create_raw(data: schemas.RawCreate, user: models.User = Depends(get_current_
 
 
 @router.patch("/raw/{rid}", response_model=schemas.RawMaterialOut)
-def update_raw(rid: uuid.UUID, data: schemas.RawUpdate, db: Session = Depends(get_db)):
+def update_raw(rid: uuid.UUID, data: schemas.RawUpdate, _: models.User = Depends(require_owner), db: Session = Depends(get_db)):
     rm = db.get(models.RawMaterial, rid)
     if not rm:
         raise HTTPException(404, "Topilmadi")
@@ -47,7 +49,7 @@ def update_raw(rid: uuid.UUID, data: schemas.RawUpdate, db: Session = Depends(ge
 
 
 @router.delete("/raw/{rid}")
-def archive_raw(rid: uuid.UUID, db: Session = Depends(get_db)):
+def archive_raw(rid: uuid.UUID, _: models.User = Depends(require_owner), db: Session = Depends(get_db)):
     rm = db.get(models.RawMaterial, rid)
     if not rm:
         raise HTTPException(404, "Topilmadi")
@@ -57,7 +59,7 @@ def archive_raw(rid: uuid.UUID, db: Session = Depends(get_db)):
 
 
 @router.post("/raw/buy", response_model=schemas.RawMaterialOut)
-def buy_raw(data: schemas.RawBuy, user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
+def buy_raw(data: schemas.RawBuy, user: models.User = Depends(require_owner), db: Session = Depends(get_db)):
     if data.material_id:
         rm = db.get(models.RawMaterial, data.material_id)
         if not rm:
@@ -77,7 +79,7 @@ def buy_raw(data: schemas.RawBuy, user: models.User = Depends(get_current_user),
 
 
 @router.post("/raw/use", response_model=schemas.RawMaterialOut)
-def use_raw(data: schemas.RawUse, user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
+def use_raw(data: schemas.RawUse, user: models.User = Depends(require_owner), db: Session = Depends(get_db)):
     rm = db.get(models.RawMaterial, data.material_id)
     if not rm:
         raise HTTPException(404, "Topilmadi")
@@ -91,7 +93,7 @@ def use_raw(data: schemas.RawUse, user: models.User = Depends(get_current_user),
 #  Inventarizatsiya va brak (har ikkala tur uchun)
 # ============================================================
 @router.post("/count")
-def stock_count(data: schemas.StockCount, user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
+def stock_count(data: schemas.StockCount, user: models.User = Depends(require_owner), db: Session = Depends(get_db)):
     item = inv.get_item(db, data.item_type, data.item_id)
     inv.adjust(db, item=item, item_type=data.item_type, actual_qty=data.actual_qty,
                note=data.note or "Inventarizatsiya", created_by=user.id,
@@ -101,7 +103,7 @@ def stock_count(data: schemas.StockCount, user: models.User = Depends(get_curren
 
 
 @router.post("/writeoff")
-def stock_writeoff(data: schemas.WriteOff, user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
+def stock_writeoff(data: schemas.WriteOff, user: models.User = Depends(require_owner), db: Session = Depends(get_db)):
     item = inv.get_item(db, data.item_type, data.item_id)
     inv.writeoff(db, item=item, item_type=data.item_type, qty=data.qty,
                  note=data.note or "Brak / yo'qotish", created_by=user.id,
@@ -115,7 +117,7 @@ def stock_writeoff(data: schemas.WriteOff, user: models.User = Depends(get_curre
 # ============================================================
 @router.post("/product/{pid}/adjust", response_model=schemas.ProductOut)
 def product_adjust(pid: uuid.UUID, data: schemas.StockUpdate,
-                   user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
+                   user: models.User = Depends(require_owner), db: Session = Depends(get_db)):
     p = db.get(models.Product, pid)
     if not p:
         raise HTTPException(404, "Mahsulot topilmadi")
@@ -158,7 +160,7 @@ def list_movements(
 
 
 @router.delete("/movements/{mid}")
-def remove_movement(mid: uuid.UUID, db: Session = Depends(get_db)):
+def remove_movement(mid: uuid.UUID, _: models.User = Depends(require_owner), db: Session = Depends(get_db)):
     """Jurnal yozuvini o'chiradi — stok va bog'liq kassa yozuvi orqaga qaytadi.
     Sotuv/ishlab chiqarishga bog'liq yozuvlar ota yozuvi orqali o'chiriladi."""
     mv = db.get(models.InventoryMovement, mid)
@@ -177,7 +179,9 @@ def _recipe_cost(db: Session, lines: list[models.ProductRecipe]) -> int:
     for r in lines:
         mat = db.get(models.RawMaterial, r.material_id)
         if mat:
-            total += int(round(float(mat.unit_price or 0) * float(r.qty)))
+            # retsept miqdorini xomashyoning ombor birligiga aylantirib narxlaymiz
+            qty_base = units.convert(float(r.qty), r.unit, mat.unit)
+            total += int(round(float(mat.unit_price or 0) * qty_base))
     return total
 
 
@@ -192,13 +196,19 @@ def get_recipe(pid: uuid.UUID, db: Session = Depends(get_db)):
 
 
 @router.put("/recipe/{pid}", response_model=schemas.RecipeOut)
-def set_recipe(pid: uuid.UUID, data: schemas.RecipeSet, db: Session = Depends(get_db)):
+def set_recipe(pid: uuid.UUID, data: schemas.RecipeSet, _: models.User = Depends(require_owner), db: Session = Depends(get_db)):
     p = db.get(models.Product, pid)
     if not p:
         raise HTTPException(404, "Mahsulot topilmadi")
     db.query(models.ProductRecipe).filter_by(product_id=pid).delete()
     for it in data.items:
-        db.add(models.ProductRecipe(product_id=pid, material_id=it.material_id, qty=it.qty))
+        mat = db.get(models.RawMaterial, it.material_id)
+        if not mat:
+            raise HTTPException(404, "Retseptdagi xomashyo topilmadi")
+        # retsept birligi xomashyo birligi bilan mos (aylantirib bo'ladigan) bo'lishi shart
+        if it.unit and not units.compatible(it.unit, mat.unit):
+            raise HTTPException(400, f"'{mat.name}' uchun '{it.unit}' birligi '{mat.unit}' bilan mos kelmaydi")
+        db.add(models.ProductRecipe(product_id=pid, material_id=it.material_id, qty=it.qty, unit=it.unit))
     db.commit()
     lines = db.query(models.ProductRecipe).filter_by(product_id=pid).all()
     return schemas.RecipeOut(
@@ -212,24 +222,26 @@ def set_recipe(pid: uuid.UUID, data: schemas.RecipeSet, db: Session = Depends(ge
 #  Ishlab chiqarish
 # ============================================================
 @router.post("/produce", response_model=schemas.ProductionOut)
-def produce(data: schemas.ProduceIn, user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
+def produce(data: schemas.ProduceIn, user: models.User = Depends(require_owner), db: Session = Depends(get_db)):
     product = db.get(models.Product, data.product_id)
     if not product:
         raise HTTPException(404, "Mahsulot topilmadi")
     prod = inv.produce(db, product=product, qty=data.qty, expiry_date=data.expiry_date,
                        note=data.note, created_by=user.id, occurred_at=data.occurred_at)
     db.commit(); db.refresh(prod)
+    logger.info("Ishlab chiqarish id=%s %s x%s tannarx=%s by=%s", prod.id, product.name, data.qty, prod.cost_total, user.email)
     return prod
 
 
 @router.delete("/productions/{pid}")
-def remove_production(pid: uuid.UUID, db: Session = Depends(get_db)):
+def remove_production(pid: uuid.UUID, user: models.User = Depends(require_owner), db: Session = Depends(get_db)):
     """Ishlab chiqarishni o'chiradi — xomashyo qaytadi, tayyor mahsulot kirimi bekor bo'ladi."""
     prod = db.get(models.Production, pid)
     if not prod:
         raise HTTPException(404, "Yozuv topilmadi")
     inv.delete_production(db, prod)
     db.commit()
+    logger.info("Ishlab chiqarish o'chirildi id=%s %s by=%s", pid, prod.product_name, user.email)
     return {"ok": True}
 
 

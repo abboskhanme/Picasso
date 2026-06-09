@@ -3,7 +3,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from .. import models, schemas
 from ..database import get_db
-from ..deps import get_current_user
+from ..deps import get_current_user, require_owner
 
 router = APIRouter(prefix="/sets", tags=["sets"], dependencies=[Depends(get_current_user)])
 
@@ -14,7 +14,7 @@ def list_sets(db: Session = Depends(get_db)):
 
 
 @router.post("", response_model=schemas.SetOut)
-def create_set(data: schemas.SetCreate, db: Session = Depends(get_db)):
+def create_set(data: schemas.SetCreate, _: models.User = Depends(require_owner), db: Session = Depends(get_db)):
     if not data.items:
         raise HTTPException(400, "Kamida 1 ta mahsulot tanlang")
     pset = models.ProductSet(name=data.name, emoji=data.emoji, image_url=data.image_url, price=data.price)
@@ -25,7 +25,7 @@ def create_set(data: schemas.SetCreate, db: Session = Depends(get_db)):
 
 
 @router.put("/{sid}", response_model=schemas.SetOut)
-def update_set(sid: uuid.UUID, data: schemas.SetUpdate, db: Session = Depends(get_db)):
+def update_set(sid: uuid.UUID, data: schemas.SetUpdate, _: models.User = Depends(require_owner), db: Session = Depends(get_db)):
     pset = db.get(models.ProductSet, sid)
     if not pset:
         raise HTTPException(404, "To'plam topilmadi")
@@ -43,7 +43,7 @@ def update_set(sid: uuid.UUID, data: schemas.SetUpdate, db: Session = Depends(ge
 
 
 @router.delete("/{sid}")
-def archive_set(sid: uuid.UUID, db: Session = Depends(get_db)):
+def archive_set(sid: uuid.UUID, _: models.User = Depends(require_owner), db: Session = Depends(get_db)):
     s = db.get(models.ProductSet, sid)
     if not s:
         raise HTTPException(404, "To'plam topilmadi")

@@ -5,11 +5,18 @@ export const getToken = () => localStorage.getItem(TOKEN_KEY);
 export const setToken = (t: string) => localStorage.setItem(TOKEN_KEY, t);
 export const clearToken = () => localStorage.removeItem(TOKEN_KEY);
 
+/** Token eskirgan/yaroqsiz (401) bo'lsa — tokenni tozalab login sahifasiga qaytaramiz. */
+function handleUnauthorized() {
+  clearToken();
+  if (!location.pathname.startsWith("/login")) location.href = "/login";
+}
+
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   const headers: Record<string, string> = { "Content-Type": "application/json", ...(options.headers as any) };
   const token = getToken();
   if (token) headers.Authorization = `Bearer ${token}`;
   const res = await fetch(`${BASE}${path}`, { ...options, headers });
+  if (res.status === 401) { handleUnauthorized(); throw new Error("Sessiya tugadi, qaytadan kiring"); }
   if (!res.ok) {
     let msg = "Xatolik yuz berdi";
     try { const e = await res.json(); msg = e.detail || msg; } catch {}
@@ -45,6 +52,18 @@ export const api = {
   patch: <T>(p: string, body?: unknown) => request<T>(p, { method: "PATCH", body: JSON.stringify(body) }),
   del: <T>(p: string) => request<T>(p, { method: "DELETE" }),
 };
+
+export interface Me { id: string; email: string; full_name: string | null; avatar_url: string | null; role: string; }
+/** Joriy foydalanuvchi (rol bilan) — rol asosida UI'ni cheklash uchun. */
+export const me = () => api.get<Me>("/auth/me");
+export const isOwner = (role?: string) => role === "owner" || role === "admin";
+
+/** Profilni yangilash (ism, login, rasm). */
+export const updateProfile = (body: { full_name?: string | null; email?: string; avatar_url?: string | null }) =>
+  api.patch<Me>("/auth/me", body);
+/** Parolni o'zgartirish (joriy parol talab qilinadi). */
+export const changePassword = (body: { current_password: string; new_password: string }) =>
+  api.post<{ ok: boolean }>("/auth/me/password", body);
 
 export async function login(email: string, password: string) {
   const form = new URLSearchParams();

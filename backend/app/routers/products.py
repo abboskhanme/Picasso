@@ -3,7 +3,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from .. import models, schemas
 from ..database import get_db
-from ..deps import get_current_user
+from ..deps import get_current_user, require_owner
 from ..services import inventory_service as inv
 
 router = APIRouter(prefix="/products", tags=["products"], dependencies=[Depends(get_current_user)])
@@ -15,7 +15,7 @@ def list_products(db: Session = Depends(get_db)):
 
 
 @router.post("", response_model=schemas.ProductOut)
-def create_product(data: schemas.ProductCreate, user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
+def create_product(data: schemas.ProductCreate, user: models.User = Depends(require_owner), db: Session = Depends(get_db)):
     payload = data.model_dump()
     initial = float(payload.pop("stock", 0) or 0)
     p = models.Product(stock=0, **payload)
@@ -28,7 +28,7 @@ def create_product(data: schemas.ProductCreate, user: models.User = Depends(get_
 
 
 @router.patch("/{pid}", response_model=schemas.ProductOut)
-def update_product(pid: uuid.UUID, data: schemas.ProductUpdate, db: Session = Depends(get_db)):
+def update_product(pid: uuid.UUID, data: schemas.ProductUpdate, _: models.User = Depends(require_owner), db: Session = Depends(get_db)):
     p = db.get(models.Product, pid)
     if not p:
         raise HTTPException(404, "Mahsulot topilmadi")
@@ -40,7 +40,7 @@ def update_product(pid: uuid.UUID, data: schemas.ProductUpdate, db: Session = De
 
 @router.post("/{pid}/stock", response_model=schemas.ProductOut)
 def update_stock(pid: uuid.UUID, data: schemas.StockUpdate,
-                 user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
+                 user: models.User = Depends(require_owner), db: Session = Depends(get_db)):
     p = db.get(models.Product, pid)
     if not p:
         raise HTTPException(404, "Mahsulot topilmadi")
@@ -56,7 +56,7 @@ def update_stock(pid: uuid.UUID, data: schemas.StockUpdate,
 
 
 @router.delete("/{pid}")
-def archive_product(pid: uuid.UUID, db: Session = Depends(get_db)):
+def archive_product(pid: uuid.UUID, _: models.User = Depends(require_owner), db: Session = Depends(get_db)):
     p = db.get(models.Product, pid)
     if not p:
         raise HTTPException(404, "Mahsulot topilmadi")

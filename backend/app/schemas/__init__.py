@@ -1,12 +1,13 @@
 import uuid
 from datetime import datetime, date
+from typing import Literal
 from pydantic import BaseModel, EmailStr, Field, ConfigDict
 
 
 # ---------- Auth ----------
 class UserRegister(BaseModel):
     email: EmailStr
-    password: str = Field(min_length=6)
+    password: str = Field(min_length=8)        # kuchliroq minimal uzunlik
     full_name: str | None = None
 
 
@@ -25,7 +26,19 @@ class UserOut(BaseModel):
     id: uuid.UUID
     email: EmailStr
     full_name: str | None
+    avatar_url: str | None = None
     role: str
+
+
+class ProfileUpdate(BaseModel):
+    full_name: str | None = None
+    email: EmailStr | None = None
+    avatar_url: str | None = None
+
+
+class PasswordChange(BaseModel):
+    current_password: str
+    new_password: str = Field(min_length=8)
 
 
 # ---------- Product (tayyor mahsulot) ----------
@@ -66,7 +79,7 @@ class ProductOut(ProductBase):
 
 
 class StockUpdate(BaseModel):
-    mode: str = "add"        # add | set
+    mode: Literal["add", "set"] = "add"
     qty: float
     occurred_at: datetime | None = None   # ixtiyoriy: kechikkan/esdan chiqqan amal sanasi
 
@@ -138,7 +151,7 @@ class RawMaterialOut(BaseModel):
 
 class RawCreate(BaseModel):
     name: str
-    category: str = "xomashyo"          # xomashyo | qadoqlash
+    category: Literal["xomashyo", "qadoqlash"] = "xomashyo"
     unit: str = "kg"
     unit_price: int = Field(default=0, ge=0)
     stock: float = 0
@@ -157,7 +170,7 @@ class RawUpdate(BaseModel):
 class RawBuy(BaseModel):
     material_id: uuid.UUID | None = None
     name: str | None = None
-    category: str = "xomashyo"
+    category: Literal["xomashyo", "qadoqlash"] = "xomashyo"
     unit: str = "kg"
     qty: float = Field(gt=0)
     cost: int = Field(ge=0)
@@ -194,7 +207,7 @@ class MovementOut(BaseModel):
 
 # ---------- Inventarizatsiya / brak ----------
 class StockCount(BaseModel):
-    item_type: str                 # product | raw
+    item_type: Literal["product", "raw"]
     item_id: uuid.UUID
     actual_qty: float = Field(ge=0)
     note: str | None = None
@@ -202,7 +215,7 @@ class StockCount(BaseModel):
 
 
 class WriteOff(BaseModel):
-    item_type: str                 # product | raw
+    item_type: Literal["product", "raw"]
     item_id: uuid.UUID
     qty: float = Field(gt=0)
     note: str | None = None
@@ -213,6 +226,7 @@ class WriteOff(BaseModel):
 class RecipeLineIn(BaseModel):
     material_id: uuid.UUID
     qty: float = Field(gt=0)
+    unit: str | None = None       # retsept birligi; bo'sh = xomashyo birligi
 
 
 class RecipeSet(BaseModel):
@@ -223,6 +237,7 @@ class RecipeLineOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     material_id: uuid.UUID
     qty: float
+    unit: str | None = None
 
 
 class RecipeOut(BaseModel):
@@ -289,9 +304,9 @@ class SaleItemIn(BaseModel):
 
 
 class SaleCreate(BaseModel):
-    kind: str = "dona"               # dona | set
+    kind: Literal["dona", "set"] = "dona"
     set_id: uuid.UUID | None = None
-    payment_method: str = "naqd"     # naqd | karta | nasiya
+    payment_method: Literal["naqd", "karta", "nasiya"] = "naqd"
     items: list[SaleItemIn] = []     # dona uchun
     customer_name: str | None = None # nasiya uchun
     customer_phone: str | None = None
@@ -336,7 +351,7 @@ class CustomerBalanceOut(BaseModel):
 
 # ---------- Finance ----------
 class CashFlowCreate(BaseModel):
-    direction: str                   # in | out
+    direction: Literal["in", "out"]
     amount: int = Field(gt=0)
     category: str | None = None
     note: str | None = None

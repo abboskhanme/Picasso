@@ -17,8 +17,9 @@ class User(Base):
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=_uuid)
     email: Mapped[str] = mapped_column(String, unique=True, index=True)
     full_name: Mapped[str | None] = mapped_column(String, nullable=True)
+    avatar_url: Mapped[str | None] = mapped_column(Text, nullable=True)   # profil rasmi (/uploads/...)
     hashed_password: Mapped[str] = mapped_column(String)
-    role: Mapped[str] = mapped_column(String, default="owner")
+    role: Mapped[str] = mapped_column(String, default="seller")  # owner | seller
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
@@ -199,6 +200,9 @@ class ProductRecipe(Base):
     product_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("products.id", ondelete="CASCADE"), index=True)
     material_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("raw_materials.id", ondelete="CASCADE"))
     qty: Mapped[float] = mapped_column(Numeric(12, 3))  # 1 dona mahsulotga ketadigan miqdor
+    # Retsept qaysi birlikda kiritilgan (masalan "gramm"). Bo'sh bo'lsa xomashyoning
+    # ombor birligida deb olinadi. Sarflashda mat.unit ga aylantiriladi (units.convert).
+    unit: Mapped[str | None] = mapped_column(String, nullable=True)
     product: Mapped["Product"] = relationship()
     material: Mapped["RawMaterial"] = relationship()
 
